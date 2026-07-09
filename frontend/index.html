@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>ИК — Таск-трекер</title>
+
+    <!-- PWA: установка на главный экран + push-уведомления. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#131019" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ИК Трекер" />
+  </head>
+  <body>
+    <!-- Сплэш до монтирования Vue: логотип + фирменное кольцо. Vue заменит содержимое #app. -->
+    <style>
+      .boot-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        background: #0a0a0c;
+      }
+      .boot-splash__stage {
+        position: relative;
+        width: 112px;
+        height: 112px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .boot-splash__ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, #df4b51, #e8863c, #18b1ad, transparent 72%);
+        -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+        mask: radial-gradient(closest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+        animation: boot-spin 1.1s linear infinite;
+      }
+      .boot-splash__logo {
+        width: 62px;
+        height: 62px;
+        border-radius: 16px;
+        box-shadow: 0 8px 40px rgba(223, 75, 81, 0.35);
+        animation: boot-pulse 1.6s ease-in-out infinite;
+      }
+      .boot-splash__label {
+        margin: 0;
+        font: 600 12px/1 'Segoe UI', system-ui, sans-serif;
+        letter-spacing: 0.32em;
+        color: #726e82;
+      }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @keyframes boot-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-splash__ring, .boot-splash__logo { animation: none; }
+      }
+    </style>
+    <div id="app">
+      <div class="boot-splash">
+        <div class="boot-splash__stage">
+          <span class="boot-splash__ring"></span>
+          <img class="boot-splash__logo" src="/icons/icon-192.png" alt="" />
+        </div>
+        <p class="boot-splash__label">ИК · ТРЕКЕР</p>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
