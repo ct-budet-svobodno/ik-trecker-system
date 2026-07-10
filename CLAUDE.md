@@ -13,12 +13,12 @@
 
 ```
 # Backend (из backend/)
-venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8100
 # Frontend (из frontend/)
 npm run dev
 ```
 
-- API: `http://localhost:8000/api`, Swagger: `http://localhost:8000/docs`. Фронт: `http://localhost:5173`.
+- API: `http://localhost:8100/api`, Swagger: `http://localhost:8100/docs`. Фронт: `http://localhost:5173`. (Бэк на 8100, а не 8000 — 8000 занят другим сервисом на сервере.)
 - Логины (dev): `admin / admin123`; демо-юзеры (`i.manaev` и др.) — `demo12345`.
 - **Готчи:** Node.js ставится отдельно (winget `OpenJS.NodeJS.LTS`). Vite слушает `localhost` (не `127.0.0.1`). Проект в OneDrive — Vite стартует медленно (~40с).
 

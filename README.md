@@ -34,10 +34,10 @@ python -m scripts.create_admin
 Запустить сервер:
 
 ```
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8100
 ```
 
-API будет на `http://localhost:8000/api`, документация — на `http://localhost:8000/docs`.
+API будет на `http://localhost:8100/api`, документация — на `http://localhost:8100/docs`.
 
 ### 2. Frontend
 
