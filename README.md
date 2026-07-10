@@ -10,6 +10,34 @@
 - Backend: FastAPI + SQLAlchemy + SQLite + Alembic
 - Frontend: Vue 3 + Vite + Pinia + Vue Router + Axios
 
+## Запуск в Docker (на сервере)
+
+```bash
+git clone https://github.com/AnatolyKozmin/task-trecker-ik.git
+cd task-trecker-ik
+cp .env.example .env        # задайте JWT_SECRET_KEY (например: openssl rand -hex 32)
+docker compose up -d --build
+```
+
+После старта:
+
+- Сайт: `http://<ip-сервера>:8084`
+- API/Swagger (только с самого сервера): `http://127.0.0.1:8100/docs`
+
+Миграции применяются автоматически при старте бэкенда. Первого админа создать один раз:
+
+```bash
+docker compose exec backend python -m scripts.create_admin
+```
+
+База (SQLite) хранится в docker-томе `backend_data` и переживает пересборку. Порты 8084/8100 выбраны свободными от других проектов на сервере; поменять можно в `docker-compose.yml`.
+
+Обновление после новых коммитов:
+
+```bash
+git pull && docker compose up -d --build
+```
+
 ## Запуск (Windows)
 
 ### 1. Backend

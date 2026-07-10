@@ -11,6 +11,9 @@ frontend/node_modules/
 frontend/.env
 frontend/dist/
 
+# Docker compose
+/.env
+
 # Editor
 .vscode/
 .idea/
