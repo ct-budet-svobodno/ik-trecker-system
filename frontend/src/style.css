@@ -154,10 +154,12 @@ select {
     padding: 18px 14px calc(88px + env(safe-area-inset-bottom)) !important;
   }
 
-  /* Модалки превращаются в нижние «шторки». */
+  /* Модалки превращаются в нижние «шторки» (закрываются смахиванием вниз —
+     жест вешает v-swipe-close, см. directives/swipeClose.js). */
   .modal-backdrop {
     align-items: flex-end !important;
     padding: 0 !important;
+    overscroll-behavior: contain;
   }
 
   .modal {
@@ -166,6 +168,43 @@ select {
     border-bottom: none !important;
     max-height: 92dvh;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* «Грип» — подсказка, что шторку можно утянуть вниз. */
+  .modal::before {
+    content: '';
+    align-self: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border-strong);
+    margin-bottom: 8px;
+  }
+}
+
+/* Шторка выезжает снизу (в паре с sheet-up у шторки «Ещё»). */
+@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .modal {
+    animation: modal-up 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .modal-backdrop {
+    animation: backdrop-in 0.2s ease;
+  }
+}
+
+@keyframes modal-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
   }
 }

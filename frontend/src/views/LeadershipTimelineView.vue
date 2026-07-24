@@ -30,7 +30,15 @@ const myDirectionIds = computed(() => {
   return ids
 })
 
-// Строки сетки: направления + 3 должности тройки.
+// Руководитель СМИ или Дизайна: строка «Редакция» — его зона ответственности.
+const isEditorialHead = computed(() => {
+  const me = authStore.user?.id
+  return tasksStore.directions.some(
+    (d) => ['СМИ', 'Дизайн'].includes(d.short_code) && (d.heads ?? []).some((h) => h.id === me),
+  )
+})
+
+// Строки сетки: направления (с «Редакцией» между СМИ и Дизайном) + должности четвёрки.
 const rows = computed(() => {
   const dirRows = tasksStore.directions.map((d) => ({
     key: `d:${d.id}`,
@@ -40,6 +48,20 @@ const rows = computed(() => {
     directionId: d.id,
     position: null,
   }))
+  const editorialRow = {
+    key: 'e',
+    kind: 'editorial',
+    name: 'Редакция',
+    color: null,
+    directionId: null,
+    position: null,
+  }
+  // «Редакция» — общая строка СМИ и Дизайна, ставим её между ними.
+  // Вставляем сразу за СМИ; если СМИ нет — перед Дизайном; иначе в конец направлений.
+  const smiIdx = dirRows.findIndex((r) => r.name === 'СМИ')
+  const designIdx = dirRows.findIndex((r) => r.name === 'Дизайн')
+  const insertAt = smiIdx !== -1 ? smiIdx + 1 : designIdx !== -1 ? designIdx : dirRows.length
+  dirRows.splice(insertAt, 0, editorialRow)
   const posRows = Object.entries(LEADERSHIP_POSITION_LABELS).map(([pos, label]) => ({
     key: `p:${pos}`,
     kind: 'position',
@@ -53,6 +75,7 @@ const rows = computed(() => {
 
 function canEditRow(row) {
   if (row.kind === 'position') return authStore.isLeadership
+  if (row.kind === 'editorial') return authStore.isLeadership || isEditorialHead.value
   return authStore.isLeadership || myDirectionIds.value.has(row.directionId)
 }
 
@@ -60,7 +83,11 @@ function canEditRow(row) {
 const itemsByCell = computed(() => {
   const map = new Map()
   for (const item of store.items) {
-    const rowKey = item.position ? `p:${item.position}` : `d:${item.direction_id}`
+    const rowKey = item.position
+      ? `p:${item.position}`
+      : item.is_editorial
+        ? 'e'
+        : `d:${item.direction_id}`
     const key = `${rowKey}|${item.date}`
     if (!map.has(key)) map.set(key, [])
     map.get(key).push(item)
@@ -89,6 +116,7 @@ function openCreate(row, day) {
     task: null,
     directionId: row.directionId,
     position: row.position,
+    isEditorial: row.kind === 'editorial',
     targetName: row.name,
     date: dayKey(day),
   }
@@ -100,6 +128,7 @@ function openEdit(row, item) {
     task: item,
     directionId: row.directionId,
     position: row.position,
+    isEditorial: row.kind === 'editorial',
     targetName: row.name,
     date: item.date,
   }
@@ -146,11 +175,17 @@ function closeModal() {
             {{ dayLabelFmt.format(day) }}
           </div>
 
-          <!-- Строки: направления + должности тройки -->
+          <!-- Строки: направления + Редакция + должности четвёрки -->
           <template v-for="row in rows" :key="row.key">
             <div
               class="rowhead"
-              :class="row.kind === 'position' ? 'rowhead--position' : `rowhead--${row.color}`"
+              :class="
+                row.kind === 'position'
+                  ? 'rowhead--position'
+                  : row.kind === 'editorial'
+                    ? 'rowhead--editorial'
+                    : `rowhead--${row.color}`
+              "
             >
               <span class="rowhead__name">{{ row.name }}</span>
             </div>
@@ -165,7 +200,8 @@ function closeModal() {
                 v-for="item in cellItems(row, day)"
                 :key="item.id"
                 class="note"
-                :class="{ 'note--done': item.status === 'done' }"
+                :class="{ 'note--done': item.status === 'done', 'note--colored': !!item.color }"
+                :style="item.color ? { '--c': item.color } : null"
                 @click.stop="openEdit(row, item)"
               >
                 <span class="note__title">{{ item.title }}</span>
@@ -183,6 +219,7 @@ function closeModal() {
       :task="modal.task"
       :direction-id="modal.directionId"
       :position="modal.position"
+      :is-editorial="modal.isEditorial"
       :target-name="modal.targetName"
       :date="modal.date"
       @close="closeModal"
@@ -319,7 +356,15 @@ function closeModal() {
 .rowhead--orange { border-left-color: var(--dir-smi); }
 .rowhead--blue { border-left-color: var(--dir-prod-a); }
 
-/* Строки руководства (тройка + бренд-менеджер) — красный текст на чёрном фоне. */
+/* Строка Редакции — общая для руководителей СМИ и Дизайна. */
+.rowhead--editorial {
+  border-left-color: var(--accent);
+}
+.rowhead--editorial .rowhead__name {
+  color: var(--accent);
+}
+
+/* Строки руководства (четвёрка) — красный текст на чёрном фоне. */
 .rowhead--position {
   border-left-color: #ff3b3b;
   background: #000;
@@ -371,10 +416,18 @@ function closeModal() {
   flex-direction: column;
   gap: 3px;
   font: inherit;
+  cursor: pointer;
 }
 
 .note:hover {
   border-color: var(--border-strong);
+}
+
+/* Задача с выбранным цветом. */
+.note--colored {
+  background: color-mix(in srgb, var(--c) 22%, var(--surface-raised));
+  border-color: color-mix(in srgb, var(--c) 55%, var(--border));
+  border-left: 3px solid var(--c);
 }
 
 .note__title {

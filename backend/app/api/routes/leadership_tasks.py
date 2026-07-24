@@ -43,8 +43,12 @@ def create_task(
             title=payload.title,
             direction_id=payload.direction_id,
             position=payload.position,
+            is_editorial=payload.is_editorial,
             task_date=payload.date,
             status=payload.status,
+            end_date=payload.end_date,
+            position_end=payload.position_end,
+            color=payload.color,
         )
     except DirectionNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
@@ -62,13 +66,11 @@ def update_task(
     task = leadership_task_repository.get_by_id(db, task_id)
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена")
+    # Берём только явно переданные клиентом поля: так None у color означает
+    # «снять цвет», а не «не трогать» (см. leadership_task_service.update).
+    fields = {k: getattr(payload, k) for k in payload.model_fields_set}
     try:
-        return leadership_task_service.update(
-            db,
-            current_user,
-            task,
-            {"title": payload.title, "date": payload.date, "status": payload.status},
-        )
+        return leadership_task_service.update(db, current_user, task, fields)
     except LeadershipAccessError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
 

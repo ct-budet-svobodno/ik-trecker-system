@@ -144,7 +144,7 @@ def unassign_role(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> EditorialPost:
-    if role not in ("writer", "designer"):
+    if role not in ("writer", "designer", "editor"):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Неизвестная роль")
     post = _get_post_or_404(db, post_id)
     try:

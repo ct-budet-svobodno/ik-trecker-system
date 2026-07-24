@@ -191,6 +191,60 @@ def test_manager_can_view_calendar(client, admin_credentials, manager_credential
     assert len(listing.json()) == 1
 
 
+def test_post_editor_third_role(client, admin_credentials):
+    admin_token = _login(client, admin_credentials)
+    editor_id = _make_member(client, admin_token, "posteditor")
+    post_id = _create_post(client, admin_token).json()["id"]
+
+    # Обычный участник не может проставиться редактором сам — роль даёт права на пост.
+    token = _login(client, {"username": "posteditor", "password": "passw0rd1"})
+    denied = client.post(
+        f"/api/editorial-posts/{post_id}/assign",
+        json={"role": "editor"},
+        headers=_auth(token),
+    )
+    assert denied.status_code == 403
+
+    # Глобальный редактор назначает редактора поста.
+    assigned = client.post(
+        f"/api/editorial-posts/{post_id}/assign",
+        json={"role": "editor", "user_id": editor_id},
+        headers=_auth(admin_token),
+    )
+    assert assigned.status_code == 200
+    assert assigned.json()["editor"]["username"] == "posteditor"
+
+    # Редактор поста правит описание и принимает текст.
+    renamed = client.patch(
+        f"/api/editorial-posts/{post_id}",
+        json={"title": "Новое название"},
+        headers=_auth(token),
+    )
+    assert renamed.status_code == 200
+    assert renamed.json()["title"] == "Новое название"
+
+    accepted = client.patch(
+        f"/api/editorial-posts/{post_id}",
+        json={"text_status": "ready"},
+        headers=_auth(token),
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["text_status"] == "ready"
+
+    # Пост попадает в «мои», а права не распространяются на другие посты.
+    mine = client.get("/api/editorial-posts/mine", headers=_auth(token))
+    assert [p["id"] for p in mine.json()] == [post_id]
+    other_id = _create_post(client, admin_token, title="Другой пост").json()["id"]
+    assert (
+        client.patch(
+            f"/api/editorial-posts/{other_id}",
+            json={"title": "взлом"},
+            headers=_auth(token),
+        ).status_code
+        == 403
+    )
+
+
 def test_assigned_outsider_sees_post_via_mine(client, admin_credentials, employee_credentials):
     admin_token = _login(client, admin_credentials)
     post_id = _create_post(client, admin_token).json()["id"]

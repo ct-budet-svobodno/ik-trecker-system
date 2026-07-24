@@ -41,6 +41,8 @@ class EditorialPostOut(BaseModel):
     writer: EditorialUser | None
     designer_id: int | None
     designer: EditorialUser | None
+    editor_id: int | None
+    editor: EditorialUser | None
     text_content: str
     text_status: EditorialStatus
     figma_url: str | None
@@ -77,7 +79,7 @@ class EditorialPostUpdate(BaseModel):
 
 
 class EditorialAssignRequest(BaseModel):
-    role: Literal["writer", "designer"]
+    role: Literal["writer", "designer", "editor"]
     # Без user_id — проставляется текущий пользователь («стать райтером»).
     user_id: int | None = None
 

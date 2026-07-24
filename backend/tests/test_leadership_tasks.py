@@ -199,6 +199,138 @@ def test_head_cannot_create_position_task(client, admin_credentials, direction):
     assert resp.status_code == 403
 
 
+def test_editorial_row(client, admin_credentials, manager_credentials, direction, smi_direction):
+    # direction = Дизайн, smi_direction = СМИ.
+    admin_token = _login(client, admin_credentials)
+    created = client.post(
+        "/api/leadership-tasks",
+        json={"title": "Спецвыпуск ко Дню ИК", "is_editorial": True, "date": DATE},
+        headers=_auth_headers(admin_token),
+    )
+    assert created.status_code == 201
+    body = created.json()
+    assert body["is_editorial"] is True
+    assert body["direction_id"] is None
+
+    # Руководитель СМИ ведёт задачи Редакции: ставит свои и закрывает существующие.
+    head_id = client.post(
+        "/api/users",
+        json={
+            "username": "smihead3",
+            "password": "headpass123",
+            "full_name": "Глава СМИ",
+            "role": "employee",
+        },
+        headers=_auth_headers(admin_token),
+    ).json()["id"]
+    client.put(
+        f"/api/directions/{smi_direction.id}/heads",
+        json={"user_ids": [head_id]},
+        headers=_auth_headers(admin_token),
+    )
+    head_token = _login(client, {"username": "smihead3", "password": "headpass123"})
+    own = client.post(
+        "/api/leadership-tasks",
+        json={"title": "Разбор постов недели", "is_editorial": True, "date": DATE},
+        headers=_auth_headers(head_token),
+    )
+    assert own.status_code == 201
+    closed = client.patch(
+        f"/api/leadership-tasks/{body['id']}",
+        json={"status": "done"},
+        headers=_auth_headers(head_token),
+    )
+    assert closed.status_code == 200
+    assert closed.json()["status"] == "done"
+
+    # Обычный менеджер (не руководитель СМИ/Дизайна, не тройка) — не может.
+    manager_token = _login(client, manager_credentials)
+    denied = client.post(
+        "/api/leadership-tasks",
+        json={"title": "нельзя", "is_editorial": True, "date": DATE},
+        headers=_auth_headers(manager_token),
+    )
+    assert denied.status_code == 403
+
+    # Редакция + направление одновременно — невалидно.
+    both = client.post(
+        "/api/leadership-tasks",
+        json={"title": "X", "is_editorial": True, "direction_id": direction.id, "date": DATE},
+        headers=_auth_headers(admin_token),
+    )
+    assert both.status_code == 422
+
+
+def test_admin_can_create_position_block_with_span_and_color(client, admin_credentials):
+    token = _login(client, admin_credentials)
+    created = client.post(
+        "/api/leadership-tasks",
+        json={
+            "title": "Блок четвёрки",
+            "position": "chairman",
+            "position_end": "first_deputy",
+            "date": "2026-07-01",
+            "end_date": "2026-07-03",
+            "color": "#3d7de0",
+        },
+        headers=_auth_headers(token),
+    )
+    assert created.status_code == 201
+    body = created.json()
+    assert body["position"] == "chairman"
+    assert body["position_end"] == "first_deputy"
+    assert body["end_date"] == "2026-07-03"
+    assert body["color"] == "#3d7de0"
+
+
+def test_position_end_must_not_precede_position(client, admin_credentials):
+    token = _login(client, admin_credentials)
+    # first_deputy идёт ниже secretary — как «верх» блока недопустим при низе secretary.
+    resp = client.post(
+        "/api/leadership-tasks",
+        json={
+            "title": "Перевёрнутый блок",
+            "position": "first_deputy",
+            "position_end": "secretary",
+            "date": DATE,
+        },
+        headers=_auth_headers(token),
+    )
+    assert resp.status_code == 422
+
+
+def test_unknown_color_rejected(client, admin_credentials):
+    token = _login(client, admin_credentials)
+    resp = client.post(
+        "/api/leadership-tasks",
+        json={"title": "X", "position": "chairman", "date": DATE, "color": "#123456"},
+        headers=_auth_headers(token),
+    )
+    assert resp.status_code == 422
+
+
+def test_block_listed_when_span_overlaps_window(client, admin_credentials):
+    token = _login(client, admin_credentials)
+    # Блок начинается до окна, но заходит в него концом — должен попасть в выборку.
+    client.post(
+        "/api/leadership-tasks",
+        json={
+            "title": "Заходящий блок",
+            "position": "chairman",
+            "date": "2026-06-29",
+            "end_date": "2026-07-02",
+        },
+        headers=_auth_headers(token),
+    )
+    listing = client.get(
+        "/api/leadership-tasks",
+        params={"date_from": "2026-07-01", "date_to": "2026-07-07"},
+        headers=_auth_headers(token),
+    )
+    assert listing.status_code == 200
+    assert len(listing.json()) == 1
+
+
 def test_admin_can_reset_password(client, admin_credentials):
     admin_token = _login(client, admin_credentials)
     user_id = client.post(

@@ -234,7 +234,7 @@ async function submitEdit() {
 
     <!-- Модалка редактирования -->
     <div v-if="editing" class="modal-backdrop" @click.self="closeEdit">
-      <form class="modal" @submit.prevent="submitEdit">
+      <form v-swipe-close="closeEdit" class="modal" @submit.prevent="submitEdit">
         <h2>{{ editing.username }}</h2>
 
         <label>ФИО</label>

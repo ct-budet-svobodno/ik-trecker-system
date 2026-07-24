@@ -73,6 +73,16 @@ def _is_designer(user: User, post: EditorialPost) -> bool:
     return post.designer_id == user.id
 
 
+def _is_post_editor(user: User, post: EditorialPost) -> bool:
+    """Назначенный редактор конкретного поста (третья роль рядом с райтером и дизайнером)."""
+    return post.editor_id == user.id
+
+
+def _is_editor_for(db: Session, user: User, post: EditorialPost) -> bool:
+    """Права редактора в рамках поста: глобальный редактор или редактор этого поста."""
+    return _is_post_editor(user, post) or is_editor(db, user)
+
+
 def _ensure_member(db: Session, viewer: User) -> None:
     if not is_member(db, viewer):
         raise EditorialAccessError("Доступ только для участников Редакции")
@@ -115,15 +125,15 @@ def get_detail(db: Session, viewer: User, post_id: int) -> EditorialPost:
     post = editorial_post_repository.get_by_id(db, post_id)
     if post is None:
         raise EditorialPostNotFoundError("Пост не найден")
-    # Назначенный райтер/дизайнер видит свой пост, даже если он не из Редакции.
-    is_assigned = viewer.id in (post.writer_id, post.designer_id)
+    # Назначенный райтер/дизайнер/редактор видит свой пост, даже если он не из Редакции.
+    is_assigned = viewer.id in (post.writer_id, post.designer_id, post.editor_id)
     if not (is_assigned or can_view(db, viewer)):
         raise EditorialAccessError("Доступ только для Редакции и руководителей")
     return post
 
 
 def list_mine(db: Session, viewer: User) -> list[EditorialPost]:
-    """Посты, где пользователь — райтер или дизайнер. Доступно всем авторизованным."""
+    """Посты, где пользователь — райтер, дизайнер или редактор. Доступно всем авторизованным."""
     return editorial_post_repository.list_assigned_to(db, viewer.id)
 
 
@@ -149,17 +159,18 @@ def update(
     provided = payload.model_fields_set
     changes: dict = {}
 
-    # Описание поста — только редактор.
+    # Описание поста — только редактор (глобальный или редактор этого поста).
     meta = ["title", "date", "format", "brief", "reference"]
     if any(field in provided for field in meta):
-        _ensure_editor(db, viewer)
+        if not _is_editor_for(db, viewer, post):
+            raise EditorialAccessError("Действие доступно только редактору")
         for field in meta:
             if field in provided:
                 changes[field] = getattr(payload, field)
 
     # Текст — назначенный райтер или редактор.
     if "text_content" in provided:
-        if not (_is_writer(viewer, post) or is_editor(db, viewer)):
+        if not (_is_writer(viewer, post) or _is_editor_for(db, viewer, post)):
             raise EditorialAccessError("Текст может править только райтер")
         changes["text_content"] = payload.text_content
 
@@ -169,7 +180,7 @@ def update(
 
     # Дизайн — назначенный дизайнер или редактор.
     if "figma_url" in provided or "design_done" in provided:
-        if not (_is_designer(viewer, post) or is_editor(db, viewer)):
+        if not (_is_designer(viewer, post) or _is_editor_for(db, viewer, post)):
             raise EditorialAccessError("Дизайн может править только дизайнер")
         if "figma_url" in provided:
             changes["figma_url"] = payload.figma_url
@@ -211,11 +222,11 @@ def _ensure_text_status_change(
     db: Session, viewer: User, post: EditorialPost, new: EditorialStatus
 ) -> None:
     # Автор/редактор могут отправить на проверку или вернуть в черновик;
-    # вернуть на правки / принять / снять — только ревьюер текста.
+    # вернуть на правки / принять / снять — ревьюер текста или редактор поста.
     if new in (EditorialStatus.REVIEW, EditorialStatus.DRAFT):
-        if _is_writer(viewer, post) or is_editor(db, viewer) or is_text_reviewer(db, viewer):
+        if _is_writer(viewer, post) or _is_editor_for(db, viewer, post) or is_text_reviewer(db, viewer):
             return
-    elif is_text_reviewer(db, viewer):
+    elif is_text_reviewer(db, viewer) or _is_post_editor(viewer, post):
         return
     raise EditorialAccessError("Недостаточно прав для смены статуса текста")
 
@@ -224,9 +235,9 @@ def _ensure_design_status_change(
     db: Session, viewer: User, post: EditorialPost, new: EditorialStatus
 ) -> None:
     if new in (EditorialStatus.REVIEW, EditorialStatus.DRAFT):
-        if _is_designer(viewer, post) or is_editor(db, viewer) or is_design_reviewer(db, viewer):
+        if _is_designer(viewer, post) or _is_editor_for(db, viewer, post) or is_design_reviewer(db, viewer):
             return
-    elif is_design_reviewer(db, viewer):
+    elif is_design_reviewer(db, viewer) or _is_post_editor(viewer, post):
         return
     raise EditorialAccessError("Недостаточно прав для смены статуса дизайна")
 
@@ -238,14 +249,21 @@ def delete(db: Session, viewer: User, post: EditorialPost) -> None:
 
 # --- Роли ---
 
+_ROLE_LABELS = {"writer": "райтером", "designer": "дизайнером", "editor": "редактором"}
+
+
 def assign_role(
     db: Session, viewer: User, post: EditorialPost, role: str, user_id: int | None
 ) -> EditorialPost:
     _ensure_member(db, viewer)
 
+    # Слот редактора раздаёт только глобальный редактор (роль даёт права на пост).
+    if role == "editor" and not is_editor(db, viewer):
+        raise EditorialAccessError("Назначить редактора поста может только редактор")
+
     target_id = viewer.id if user_id is None else user_id
     assigning_other = target_id != viewer.id
-    if assigning_other and not is_editor(db, viewer):
+    if assigning_other and not _is_editor_for(db, viewer, post):
         raise EditorialAccessError("Назначать других может только редактор")
 
     if user_id is not None and user_repository.get_by_id(db, user_id) is None:
@@ -254,7 +272,7 @@ def assign_role(
     slot_field = f"{role}_id"
     current = getattr(post, slot_field)
     # Самозапись — только в пустой слот; редактор может переназначать.
-    if current is not None and current != target_id and not is_editor(db, viewer):
+    if current is not None and current != target_id and not _is_editor_for(db, viewer, post):
         raise EditorialAccessError("Роль уже занята")
 
     changes = {slot_field: target_id}
@@ -265,8 +283,7 @@ def assign_role(
         changes["design_status"] = EditorialStatus.DRAFT
 
     editorial_post_repository.update_fields(db, post, changes)
-    role_label = "райтером" if role == "writer" else "дизайнером"
-    _push(db, [target_id], viewer, f"Вас назначили {role_label}", post)
+    _push(db, [target_id], viewer, f"Вас назначили {_ROLE_LABELS[role]}", post)
     return editorial_post_repository.get_by_id(db, post.id)
 
 
@@ -274,7 +291,7 @@ def unassign_role(db: Session, viewer: User, post: EditorialPost, role: str) -> 
     _ensure_member(db, viewer)
     slot_field = f"{role}_id"
     current = getattr(post, slot_field)
-    if current is not None and current != viewer.id and not is_editor(db, viewer):
+    if current is not None and current != viewer.id and not _is_editor_for(db, viewer, post):
         raise EditorialAccessError("Снять роль может сам исполнитель или редактор")
     editorial_post_repository.update_fields(db, post, {slot_field: None})
     return editorial_post_repository.get_by_id(db, post.id)
@@ -284,8 +301,8 @@ def unassign_role(db: Session, viewer: User, post: EditorialPost, role: str) -> 
 
 def _can_comment(db: Session, viewer: User, post: EditorialPost, target: EditorialCommentTarget) -> bool:
     if target == EditorialCommentTarget.TEXT:
-        return _is_writer(viewer, post) or is_text_reviewer(db, viewer) or is_editor(db, viewer)
-    return _is_designer(viewer, post) or is_design_reviewer(db, viewer) or is_editor(db, viewer)
+        return _is_writer(viewer, post) or is_text_reviewer(db, viewer) or _is_editor_for(db, viewer, post)
+    return _is_designer(viewer, post) or is_design_reviewer(db, viewer) or _is_editor_for(db, viewer, post)
 
 
 def add_comment(
@@ -332,7 +349,7 @@ def set_comment_resolved(
         if comment.target == EditorialCommentTarget.TEXT
         else is_design_reviewer(db, viewer)
     )
-    if not (is_reviewer or is_editor(db, viewer) or comment.author_id == viewer.id):
+    if not (is_reviewer or _is_editor_for(db, viewer, post) or comment.author_id == viewer.id):
         raise EditorialAccessError("Недостаточно прав, чтобы закрыть комментарий")
     editorial_post_repository.update_comment(db, comment, {"resolved": resolved})
     return editorial_post_repository.get_by_id(db, post.id)
@@ -342,7 +359,7 @@ def delete_comment(
     db: Session, viewer: User, post: EditorialPost, comment: EditorialComment
 ) -> EditorialPost:
     _ensure_member(db, viewer)
-    if not (comment.author_id == viewer.id or is_editor(db, viewer)):
+    if not (comment.author_id == viewer.id or _is_editor_for(db, viewer, post)):
         raise EditorialAccessError("Удалить комментарий может автор или редактор")
     editorial_post_repository.delete_comment(db, comment)
     return editorial_post_repository.get_by_id(db, post.id)

@@ -54,7 +54,7 @@ async function handleSubmit() {
 
 <template>
   <div class="modal-backdrop" @click.self="$emit('close')">
-    <form class="modal" @submit.prevent="handleSubmit">
+    <form v-swipe-close="() => $emit('close')" class="modal" @submit.prevent="handleSubmit">
       <h2>Выдать ТЗ</h2>
 
       <label for="task-title">Название</label>

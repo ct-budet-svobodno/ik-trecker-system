@@ -14,6 +14,7 @@ def _base_query():
     return select(EditorialPost).options(
         joinedload(EditorialPost.writer),
         joinedload(EditorialPost.designer),
+        joinedload(EditorialPost.editor),
         joinedload(EditorialPost.created_by),
     )
 
@@ -30,7 +31,11 @@ def list_in_range(db: Session, date_from: date, date_to: date) -> list[Editorial
 def list_assigned_to(db: Session, user_id: int) -> list[EditorialPost]:
     query = (
         _base_query()
-        .where((EditorialPost.writer_id == user_id) | (EditorialPost.designer_id == user_id))
+        .where(
+            (EditorialPost.writer_id == user_id)
+            | (EditorialPost.designer_id == user_id)
+            | (EditorialPost.editor_id == user_id)
+        )
         .order_by(EditorialPost.date, EditorialPost.id)
     )
     return list(db.scalars(query).unique())

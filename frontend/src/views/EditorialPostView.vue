@@ -57,15 +57,32 @@ const isEditor = computed(() => isTextReviewer.value || isDesignReviewer.value)
 
 const isWriter = computed(() => post.value && post.value.writer_id === me.value?.id)
 const isDesigner = computed(() => post.value && post.value.designer_id === me.value?.id)
+// Редактор конкретного поста — третья роль; в рамках поста равен глобальному редактору.
+const isPostEditor = computed(() => post.value && post.value.editor_id === me.value?.id)
+const canManagePost = computed(() => isEditor.value || isPostEditor.value)
 
-const canEditText = computed(() => isWriter.value || isEditor.value)
-const canEditDesign = computed(() => isDesigner.value || isEditor.value)
+const canEditText = computed(() => isWriter.value || canManagePost.value)
+const canEditDesign = computed(() => isDesigner.value || canManagePost.value)
 
 const textComments = computed(() => (post.value?.comments ?? []).filter((c) => c.target === 'text'))
 const designComments = computed(() => (post.value?.comments ?? []).filter((c) => c.target === 'design'))
 
-const canCommentText = computed(() => isWriter.value || isTextReviewer.value || isEditor.value)
-const canCommentDesign = computed(() => isDesigner.value || isDesignReviewer.value || isEditor.value)
+const canCommentText = computed(() => isWriter.value || isTextReviewer.value || canManagePost.value)
+const canCommentDesign = computed(() => isDesigner.value || isDesignReviewer.value || canManagePost.value)
+
+// Роли поста и подписи для кнопок «проставиться».
+const POST_ROLES = ['writer', 'designer', 'editor']
+const SELF_ASSIGN_LABELS = { writer: 'райтером', designer: 'дизайнером', editor: 'редактором' }
+
+// «Стать редактором» — только для редакторов (роль даёт права на пост);
+// райтером/дизайнером может проставиться любой участник Редакции.
+function canSelfAssign(role) {
+  return role === 'editor' ? isEditor.value : authStore.isEditorial
+}
+
+function canAssignOthers(role) {
+  return role === 'editor' ? isEditor.value : canManagePost.value
+}
 
 async function loadEverything() {
   error.value = ''
@@ -75,7 +92,7 @@ async function loadEverything() {
     textDraft.value = post.value?.text_content ?? ''
     figmaDraft.value = post.value?.figma_url ?? ''
     designDoneDraft.value = post.value?.design_done ?? false
-    if (isEditor.value) {
+    if (canManagePost.value) {
       const users = await fetchUsers()
       members.value = users.filter((u) => u.is_editorial && u.is_active)
     }
@@ -162,7 +179,7 @@ function statusColor(status) {
             </p>
             <h1>{{ post.title }}</h1>
           </div>
-          <button v-if="isEditor" class="btn-ghost" @click="showMetaModal = true">Изменить</button>
+          <button v-if="canManagePost" class="btn-ghost" @click="showMetaModal = true">Изменить</button>
         </div>
 
         <!-- Описание -->
@@ -175,7 +192,7 @@ function statusColor(status) {
 
         <!-- Роли -->
         <section class="card roles">
-          <div v-for="role in ['writer', 'designer']" :key="role" class="role">
+          <div v-for="role in POST_ROLES" :key="role" class="role">
             <span class="role__label">{{ EDITORIAL_ROLE_LABELS[role] }}</span>
             <template v-if="post[`${role}_id`]">
               <span class="role__person">
@@ -185,7 +202,7 @@ function statusColor(status) {
                 {{ post[role].full_name }}
               </span>
               <button
-                v-if="isEditor || post[`${role}_id`] === me?.id"
+                v-if="canManagePost || post[`${role}_id`] === me?.id"
                 class="link"
                 @click="unassignRole(role)"
               >
@@ -194,11 +211,11 @@ function statusColor(status) {
             </template>
             <template v-else>
               <span class="role__empty">не назначен</span>
-              <button v-if="authStore.isEditorial" class="btn-mini" @click="assignSelf(role)">
-                Стать {{ role === 'writer' ? 'райтером' : 'дизайнером' }}
+              <button v-if="canSelfAssign(role)" class="btn-mini" @click="assignSelf(role)">
+                Стать {{ SELF_ASSIGN_LABELS[role] }}
               </button>
               <select
-                v-if="isEditor && members.length"
+                v-if="canAssignOthers(role) && members.length"
                 class="role__select"
                 @change="assignUser(role, Number($event.target.value)); $event.target.value = ''"
               >
@@ -232,7 +249,7 @@ function statusColor(status) {
               <button class="btn-ghost" @click="saveText">Сохранить</button>
               <button class="btn-primary" @click="submitText">Отправить на проверку</button>
             </div>
-            <div v-if="isTextReviewer" class="panel__actions">
+            <div v-if="isTextReviewer || isPostEditor" class="panel__actions">
               <button class="btn-ghost" @click="setTextStatus('fixes')">Вернуть на правки</button>
               <button class="btn-primary" @click="setTextStatus('ready')">Принять</button>
             </div>
@@ -241,7 +258,7 @@ function statusColor(status) {
             <CommentThread
               :comments="textComments"
               :can-comment="canCommentText"
-              :can-resolve="isTextReviewer || isEditor"
+              :can-resolve="isTextReviewer || canManagePost"
               :current-user-id="me?.id"
               @add="addComment('text', $event)"
               @resolve="resolveComment"
@@ -280,7 +297,7 @@ function statusColor(status) {
               </p>
             </template>
 
-            <div v-if="isDesignReviewer" class="panel__actions">
+            <div v-if="isDesignReviewer || isPostEditor" class="panel__actions">
               <button class="btn-ghost" @click="setDesignStatus('fixes')">Вернуть на правки</button>
               <button class="btn-primary" @click="setDesignStatus('ready')">Принять</button>
             </div>
@@ -289,7 +306,7 @@ function statusColor(status) {
             <CommentThread
               :comments="designComments"
               :can-comment="canCommentDesign"
-              :can-resolve="isDesignReviewer || isEditor"
+              :can-resolve="isDesignReviewer || canManagePost"
               :current-user-id="me?.id"
               @add="addComment('design', $event)"
               @resolve="resolveComment"

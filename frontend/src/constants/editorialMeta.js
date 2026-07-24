@@ -19,6 +19,7 @@ export const EDITORIAL_STATUS_COLORS = {
 export const EDITORIAL_ROLE_LABELS = {
   writer: 'Райтер',
   designer: 'Дизайнер',
+  editor: 'Редактор',
 }
 
 // Приоритет для агрегированного статуса поста (какой трек «главнее» на плашке).

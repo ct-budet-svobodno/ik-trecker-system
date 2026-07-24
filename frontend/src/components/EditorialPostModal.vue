@@ -71,7 +71,7 @@ async function handleDelete() {
 
 <template>
   <div class="modal-backdrop" @click.self="$emit('close')">
-    <form class="modal" @submit.prevent="handleSubmit">
+    <form v-swipe-close="() => $emit('close')" class="modal" @submit.prevent="handleSubmit">
       <h2>{{ isEditMode ? 'Редактировать пост' : 'Новый пост' }}</h2>
 
       <div class="modal__row">

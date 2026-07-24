@@ -85,7 +85,7 @@ function handleLogout() {
   <!-- Шторка «Ещё» -->
   <Teleport to="body">
     <div v-if="sheetOpen" class="sheet-backdrop" @click.self="sheetOpen = false">
-      <div class="sheet">
+      <div v-swipe-close="() => (sheetOpen = false)" class="sheet">
         <span class="sheet__grip" />
 
         <div class="sheet__section">
@@ -223,6 +223,9 @@ function handleLogout() {
 
 .sheet {
   width: 100%;
+  max-height: 88dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);

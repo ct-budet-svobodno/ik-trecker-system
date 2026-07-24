@@ -37,8 +37,10 @@ class EditorialPost(Base):
     reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Роли. Заполняются самим участником («проставился») или редактором.
+    # editor_id — редактор конкретного поста: имеет права редактора в его рамках.
     writer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     designer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    editor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     # Текстовый трек.
     text_content: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -60,6 +62,7 @@ class EditorialPost(Base):
 
     writer: Mapped[User | None] = relationship(foreign_keys=[writer_id])
     designer: Mapped[User | None] = relationship(foreign_keys=[designer_id])
+    editor: Mapped[User | None] = relationship(foreign_keys=[editor_id])
     created_by: Mapped[User] = relationship(foreign_keys=[created_by_id])
     comments: Mapped[list["EditorialComment"]] = relationship(
         back_populates="post",
