@@ -39,6 +39,12 @@ const routes = [
     meta: { requiresAuth: true, requiresEditorial: true },
   },
   {
+    path: '/zavod',
+    name: 'zavod',
+    component: () => import('../views/ZavodView.vue'),
+    meta: { requiresAuth: true, requiresZavod: true },
+  },
+  {
     // Карточка поста доступна и назначенному исполнителю без вкладки Редакции —
     // права проверяет бэкенд (403 → редирект в календарь).
     path: '/editorial/:id',
@@ -66,6 +72,9 @@ router.beforeEach((to) => {
     return { name: 'tasks' }
   }
   if (to.meta.requiresEditorial && !authStore.isEditorial) {
+    return { name: 'tasks' }
+  }
+  if (to.meta.requiresZavod && !authStore.isZavod) {
     return { name: 'tasks' }
   }
   if (to.name === 'login' && authStore.isAuthenticated) {

@@ -28,7 +28,7 @@ const isEditorialActive = computed(
 )
 // «Ещё» активна, когда открыт раздел из шторки.
 const isMoreActive = computed(() =>
-  ['leadership-timeline', 'users'].includes(route.name),
+  ['leadership-timeline', 'zavod', 'users'].includes(route.name),
 )
 
 // query по умолчанию пустой: таб «Задачи» всегда сбрасывает на «Мои задачи».
@@ -96,6 +96,10 @@ function handleLogout() {
             @click="go('leadership-timeline')"
           >
             Таймлайн руководства
+            <span class="sheet-item__lock">🔒</span>
+          </button>
+          <button v-if="authStore.isZavod" class="sheet-item" @click="go('zavod')">
+            ZAVOD
             <span class="sheet-item__lock">🔒</span>
           </button>
           <button v-if="authStore.isAdmin" class="sheet-item" @click="go('users')">

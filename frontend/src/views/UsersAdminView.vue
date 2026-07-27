@@ -85,6 +85,7 @@ function openEdit(user) {
     leadership_position: user.leadership_position ?? '',
     is_active: user.is_active,
     is_editorial: user.is_editorial,
+    is_zavod: user.is_zavod,
     password: '',
     // id направлений, где он руководитель (для чекбоксов).
     directionIds: headedDirections(user).map((d) => d.id),
@@ -106,6 +107,7 @@ async function submitEdit() {
       role: e.role,
       is_active: e.is_active,
       is_editorial: e.is_editorial,
+      is_zavod: e.is_zavod,
       leadership_position: e.leadership_position || null,
     }
     if (e.password) payload.password = e.password
@@ -186,6 +188,7 @@ async function submitEdit() {
               <th>Должность</th>
               <th>Направления</th>
               <th>Редакция</th>
+              <th>ZAVOD</th>
               <th>Статус</th>
               <th></th>
             </tr>
@@ -218,6 +221,10 @@ async function submitEdit() {
               </td>
               <td>
                 <span v-if="user.is_editorial" class="edit-chip">Редакция</span>
+                <span v-else class="muted muted--small">—</span>
+              </td>
+              <td>
+                <span v-if="user.is_zavod" class="zavod-chip">ZAVOD</span>
                 <span v-else class="muted muted--small">—</span>
               </td>
               <td>
@@ -267,6 +274,11 @@ async function submitEdit() {
         <label class="modal__check">
           <input v-model="editing.is_editorial" type="checkbox" />
           Участник Редакции (SMM-календарь)
+        </label>
+
+        <label class="modal__check">
+          <input v-model="editing.is_zavod" type="checkbox" />
+          Доступ к ZAVOD (доска тем)
         </label>
 
         <label class="modal__check">
@@ -421,7 +433,7 @@ h1 {
   }
 
   .utable {
-    min-width: 720px;
+    min-width: 800px;
   }
 }
 
@@ -501,6 +513,15 @@ h1 {
   color: var(--dir-smi, #a06bef);
   border-radius: 6px;
   padding: 2px 8px;
+}
+
+.zavod-chip {
+  font-size: 12px;
+  background: color-mix(in srgb, var(--success) 20%, transparent);
+  color: var(--success);
+  border-radius: 6px;
+  padding: 2px 8px;
+  letter-spacing: 0.04em;
 }
 
 .dir-picker {

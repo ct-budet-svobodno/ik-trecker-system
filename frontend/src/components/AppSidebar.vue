@@ -63,6 +63,10 @@ function goToEditorial() {
   router.push({ name: 'editorial' })
 }
 
+function goToZavod() {
+  router.push({ name: 'zavod' })
+}
+
 function goToUsers() {
   router.push({ name: 'users' })
 }
@@ -141,6 +145,16 @@ function handleLogout() {
         <span class="nav-item__dot nav-item__dot--all" />
         <span class="nav-item__name">Таймлайн руководства</span>
         <span class="nav-item__lock" title="Только для руководителей">🔒</span>
+      </button>
+      <button
+        v-if="authStore.isZavod"
+        class="nav-item"
+        :class="{ 'nav-item--active': route.name === 'zavod' }"
+        @click="goToZavod"
+      >
+        <span class="nav-item__dot nav-item__dot--all" />
+        <span class="nav-item__name">ZAVOD</span>
+        <span class="nav-item__lock" title="Доступ по списку">🔒</span>
       </button>
       <button
         v-if="authStore.isAdmin"

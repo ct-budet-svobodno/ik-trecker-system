@@ -24,6 +24,11 @@ export const useAuthStore = defineStore('auth', {
     // Редактор Редакции: ревьюер СМИ/Дизайна или админ (создаёт посты, назначает роли).
     isEditorialEditor: (state) =>
       state.user?.role === 'admin' || !!state.user?.is_editorial_reviewer,
+    // Кто видит ZAVOD: отмеченные флагом, админы и руководство.
+    isZavod: (state) =>
+      state.user?.role === 'admin' ||
+      !!state.user?.leadership_position ||
+      !!state.user?.is_zavod,
   },
 
   actions: {

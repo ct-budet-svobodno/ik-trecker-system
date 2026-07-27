@@ -62,5 +62,6 @@ def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get
         role=user_update.role,
         is_active=user_update.is_active,
         is_editorial=user_update.is_editorial,
+        is_zavod=user_update.is_zavod,
     )
     return _with_reviewer_flag(db, user)

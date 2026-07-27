@@ -20,6 +20,8 @@ class UserUpdate(BaseModel):
     leadership_position: LeadershipPosition | None = None
     # Участник Редакции (передаётся при изменении).
     is_editorial: bool | None = None
+    # Доступ к разделу ZAVOD (передаётся при изменении).
+    is_zavod: bool | None = None
     # Сброс пароля админом (необязательно).
     password: str | None = Field(default=None, min_length=8, max_length=128)
 
@@ -34,6 +36,7 @@ class UserOut(BaseModel):
     leadership_position: LeadershipPosition | None = None
     is_active: bool
     is_editorial: bool = False
+    is_zavod: bool = False
     # Вычисляется в роутах: True для админа и руководителей СМИ/Дизайна.
     # Нужно фронту, чтобы показать вкладку «Редакция» ревьюерам без личного флага.
     is_editorial_reviewer: bool = False

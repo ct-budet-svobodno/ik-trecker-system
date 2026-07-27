@@ -37,4 +37,7 @@ class User(Base):
     # Участник Редакции (СМИ + Дизайн) — видит SMM-календарь и может ставиться
     # райтером/дизайнером. Ставит флаг админ.
     is_editorial: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Доступ к разделу ZAVOD (доска тем). Ставит флаг админ; сверх этого раздел
+    # видят админы и руководство — см. геттер isZavod на фронте.
+    is_zavod: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
