@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/auth'
 
 const username = ref('')
 const password = ref('')
+const showPassword = ref(false)
 const error = ref('')
 const isSubmitting = ref(false)
 
@@ -40,7 +41,45 @@ async function handleSubmit() {
       <input id="username" v-model="username" type="text" autocomplete="username" required />
 
       <label for="password">Пароль</label>
-      <input id="password" v-model="password" type="password" autocomplete="current-password" required />
+      <div class="pw-field">
+        <input
+          id="password"
+          v-model="password"
+          :type="showPassword ? 'text' : 'password'"
+          autocomplete="current-password"
+          required
+        />
+        <button
+          type="button"
+          class="pw-toggle"
+          :title="showPassword ? 'Скрыть пароль' : 'Показать пароль'"
+          :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'"
+          :aria-pressed="showPassword"
+          @click="showPassword = !showPassword"
+        >
+          <svg v-if="!showPassword" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"
+            />
+            <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.9 4.7A9.6 9.6 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.4 4.3M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 3.1-.5"
+            />
+          </svg>
+        </button>
+      </div>
 
       <p v-if="error" class="error">{{ error }}</p>
 
@@ -161,6 +200,43 @@ input:focus {
   outline: none;
   border-color: var(--dir-prod-b);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dir-prod-b) 22%, transparent);
+}
+
+/* Поле пароля с кнопкой-глазом. */
+.pw-field {
+  position: relative;
+  display: flex;
+}
+
+.pw-field input {
+  flex: 1;
+  /* Место под кнопку, чтобы текст не заезжал под неё. */
+  padding-right: 42px;
+}
+
+.pw-field .pw-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  margin: 0;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.pw-field .pw-toggle:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+  box-shadow: none;
 }
 
 .error {
