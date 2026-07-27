@@ -32,3 +32,15 @@ class EditorialAccessError(Exception):
 
 class EditorialPostNotFoundError(Exception):
     pass
+
+
+class ZavodNotFoundError(Exception):
+    """Доска, карточка или связь не найдена."""
+
+    pass
+
+
+class ZavodInvalidEdgeError(Exception):
+    """Связь бессмысленна: сама на себя, дубль или между разными досками."""
+
+    pass

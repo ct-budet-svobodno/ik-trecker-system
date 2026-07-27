@@ -32,6 +32,21 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 
+def require_zavod(current_user: User = Depends(get_current_user)) -> User:
+    """Доступ к ZAVOD: личный флаг, админ или должность руководства.
+    Зеркало геттера isZavod на фронте — держать эти два места в согласии."""
+    if (
+        current_user.role != UserRole.ADMIN
+        and current_user.leadership_position is None
+        and not current_user.is_zavod
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Нет доступа к ZAVOD",
+        )
+    return current_user
+
+
 def require_role(*roles: UserRole):
     def dependency(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in roles:

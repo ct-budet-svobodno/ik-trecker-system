@@ -10,6 +10,7 @@ from app.api.routes import (
     push,
     tasks,
     users,
+    zavod,
 )
 
 api_router = APIRouter()
@@ -28,3 +29,4 @@ api_router.include_router(
     editorial_posts.router, prefix="/editorial-posts", tags=["editorial-posts"]
 )
 api_router.include_router(push.router, prefix="/push", tags=["push"])
+api_router.include_router(zavod.router, prefix="/zavod", tags=["zavod"])

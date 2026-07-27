@@ -11,6 +11,7 @@ from app.models.leadership_task import LeadershipTask, LeadershipTaskStatus
 from app.models.push_subscription import PushSubscription
 from app.models.task import Task, TaskPriority, TaskStatus
 from app.models.user import LeadershipPosition, User, UserRole
+from app.models.zavod import ZavodBoard, ZavodEdge, ZavodNode, ZavodNodeStatus
 
 __all__ = [
     "Direction",
@@ -29,4 +30,8 @@ __all__ = [
     "TaskStatus",
     "User",
     "UserRole",
+    "ZavodBoard",
+    "ZavodEdge",
+    "ZavodNode",
+    "ZavodNodeStatus",
 ]
