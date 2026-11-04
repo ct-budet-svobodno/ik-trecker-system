@@ -40,19 +40,29 @@ git pull && docker compose up -d --build
 
 ### Автодеплой через GitHub Actions
 
-Пуш в `main` запускает `.github/workflows/deploy.yml`: workflow заходит на сервер по SSH, обновляет код из этого репозитория и пересобирает контейнеры. Секреты приложения (`.env`, база, токены Telegram) остаются на сервере и в GitHub не передаются.
+Репозиторий приватный, поэтому серверу нужен read-only доступ к нему. Пуш в `main` запускает `.github/workflows/deploy.yml`: workflow заходит на сервер по SSH, обновляет код из этого репозитория и пересобирает контейнеры. Секреты приложения (`.env`, база, токены Telegram) остаются на сервере и в GitHub не передаются.
 
-Один раз на сервере проверьте, что проект смотрит в новый репозиторий:
+**1. Доступ сервера к репозиторию (один раз).** На сервере создайте отдельный ключ:
+
+```bash
+ssh-keygen -t ed25519 -C "ik-trecker deploy" -f ~/.ssh/ik_trecker_deploy -N ""
+cat ~/.ssh/ik_trecker_deploy.pub
+```
+
+Публичный ключ добавьте в GitHub → Settings → Deploy keys → Add deploy key (read-only). Затем в папке проекта:
 
 ```bash
 cd /путь/к/ik-trecker-system
-git remote set-url origin https://github.com/ct-budet-svobodno/ik-trecker-system.git
+git remote set-url origin git@github.com:ct-budet-svobodno/ik-trecker-system.git
+git config core.sshCommand "ssh -i ~/.ssh/ik_trecker_deploy -o IdentitiesOnly=yes"
 git fetch origin main
 git checkout main
 git pull --ff-only origin main
 ```
 
-В GitHub → Settings → Secrets and variables → Actions добавьте:
+Если сделать репозиторий публичным, deploy key не нужен — достаточно HTTPS-адреса.
+
+**2. Доступ GitHub Actions к серверу.** В GitHub → Settings → Secrets and variables → Actions добавьте:
 
 | Секрет | Значение |
 | --- | --- |

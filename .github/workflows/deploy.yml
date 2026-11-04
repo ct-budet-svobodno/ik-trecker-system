@@ -46,18 +46,12 @@ jobs:
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
         run: |
           set -euo pipefail
           PORT="${DEPLOY_PORT:-22}"
           ssh -i ~/.ssh/deploy_key -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
             "set -euo pipefail
              cd '$DEPLOY_PATH'
-             if git remote get-url origin >/dev/null 2>&1; then
-               git remote set-url origin '$REPO_URL'
-             else
-               git remote add origin '$REPO_URL'
-             fi
              git fetch origin main
              git checkout main
              git pull --ff-only origin main
