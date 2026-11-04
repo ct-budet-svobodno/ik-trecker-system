@@ -13,8 +13,8 @@
 ## Запуск в Docker (на сервере)
 
 ```bash
-git clone https://github.com/AnatolyKozmin/task-trecker-ik.git
-cd task-trecker-ik
+git clone https://github.com/ct-budet-svobodno/ik-trecker-system.git
+cd ik-trecker-system
 cp .env.example .env        # задайте JWT_SECRET_KEY (например: openssl rand -hex 32)
 docker compose up -d --build
 ```
@@ -37,6 +37,32 @@ docker compose exec backend python -m scripts.create_admin
 ```bash
 git pull && docker compose up -d --build
 ```
+
+### Автодеплой через GitHub Actions
+
+Пуш в `main` запускает `.github/workflows/deploy.yml`: workflow заходит на сервер по SSH, обновляет код из этого репозитория и пересобирает контейнеры. Секреты приложения (`.env`, база, токены Telegram) остаются на сервере и в GitHub не передаются.
+
+Один раз на сервере проверьте, что проект смотрит в новый репозиторий:
+
+```bash
+cd /путь/к/ik-trecker-system
+git remote set-url origin https://github.com/ct-budet-svobodno/ik-trecker-system.git
+git fetch origin main
+git checkout main
+git pull --ff-only origin main
+```
+
+В GitHub → Settings → Secrets and variables → Actions добавьте:
+
+| Секрет | Значение |
+| --- | --- |
+| `DEPLOY_HOST` | хост или IP сервера |
+| `DEPLOY_USER` | пользователь SSH |
+| `DEPLOY_PATH` | абсолютный путь к проекту на сервере |
+| `DEPLOY_SSH_KEY` | приватный SSH-ключ для деплоя |
+| `DEPLOY_PORT` | порт SSH (необязательно, по умолчанию 22) |
+
+Публичную часть `DEPLOY_SSH_KEY` добавьте в `~/.ssh/authorized_keys` пользователя `DEPLOY_USER` на сервере. Пока `DEPLOY_HOST` не задан, workflow завершается без деплоя. После настройки секретов деплой запускается пушем в `main` или вручную через вкладку Actions.
 
 ## Запуск (Windows)
 
