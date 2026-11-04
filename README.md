@@ -42,25 +42,29 @@ git pull && docker compose up -d --build
 
 Репозиторий приватный, поэтому серверу нужен read-only доступ к нему. Пуш в `main` запускает `.github/workflows/deploy.yml`: workflow заходит на сервер по SSH, обновляет код из этого репозитория и пересобирает контейнеры. Секреты приложения (`.env`, база, токены Telegram) остаются на сервере и в GitHub не передаются.
 
-**1. Доступ сервера к репозиторию (один раз).** На сервере создайте отдельный ключ:
+**1. Доступ сервера к репозиторию (один раз).** В организации `ct-budet-svobodno` deploy keys запрещены, поэтому используем fine-grained PAT только на чтение:
 
-```bash
-ssh-keygen -t ed25519 -C "ik-trecker deploy" -f ~/.ssh/ik_trecker_deploy -N ""
-cat ~/.ssh/ik_trecker_deploy.pub
-```
+1. GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
+2. Resource owner — `ct-budet-svobodno`, доступ только к репозиторию `ik-trecker-system`.
+3. Repository permissions → **Contents: Read-only**. Больше прав не выдавать.
+4. Скопировать токен.
 
-Публичный ключ добавьте в GitHub → Settings → Deploy keys → Add deploy key (read-only). Затем в папке проекта:
+На сервере в папке проекта:
 
 ```bash
 cd /путь/к/ik-trecker-system
-git remote set-url origin git@github.com:ct-budet-svobodno/ik-trecker-system.git
-git config core.sshCommand "ssh -i ~/.ssh/ik_trecker_deploy -o IdentitiesOnly=yes"
+git remote set-url origin https://github.com/ct-budet-svobodno/ik-trecker-system.git
+git config credential.helper store
 git fetch origin main
+# username: x-access-token
+# password: <fine-grained PAT>
 git checkout main
 git pull --ff-only origin main
 ```
 
-Если сделать репозиторий публичным, deploy key не нужен — достаточно HTTPS-адреса.
+Токен сохранится в `~/.git-credentials` на сервере и в репозиторий не попадёт.
+
+Если сделать репозиторий публичным, PAT не нужен — достаточно HTTPS-адреса без авторизации.
 
 **2. Доступ GitHub Actions к серверу.** В GitHub → Settings → Secrets and variables → Actions добавьте:
 
