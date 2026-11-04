@@ -1,15 +1,20 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import BaseIcon from './BaseIcon.vue'
 import PushToggle from './PushToggle.vue'
+import TelegramLink from './TelegramLink.vue'
 import logoIk from '../assets/logo_ik.svg'
 import { ROLE_LABELS } from '../constants/roleLabels'
 import { useAuthStore } from '../stores/auth'
 import { useTasksStore } from '../stores/tasks'
 import { useUiStore } from '../stores/ui'
 import { getAvatarColor, getInitials } from '../utils/avatar'
+import { isAssignedTo } from '../utils/taskProgress'
+import { isTelegram } from '../utils/telegram'
+
+const inTelegram = isTelegram()
 
 const authStore = useAuthStore()
 const tasksStore = useTasksStore()
@@ -17,38 +22,68 @@ const uiStore = useUiStore()
 const router = useRouter()
 const route = useRoute()
 
+// Счётчики и список направлений нужны меню на любой странице, а не только на доске.
+onMounted(() => {
+  if (!tasksStore.directions.length && !tasksStore.isLoading) tasksStore.loadAll()
+})
+
 const activeDirectionId = computed(() =>
   route.query.direction ? Number(route.query.direction) : null,
 )
 
-const totalCount = computed(() => tasksStore.tasks.length)
+const totalCount = computed(() => tasksStore.tasks.filter((task) => !task.is_private).length)
+
+const privateCount = computed(() => {
+  const uid = authStore.user?.id
+  return tasksStore.tasks.filter(
+    (task) => task.is_private && (authStore.seesAllPrivate || task.created_by_id === uid),
+  ).length
+})
 
 const myTasksCount = computed(() => {
   const uid = authStore.user?.id
-  return tasksStore.tasks.filter((task) => task.assignee?.id === uid).length
+  return tasksStore.tasks.filter((task) => isAssignedTo(task, uid)).length
 })
 
 // Пустой /tasks (без direction и без all) = «Мои задачи».
 const isMyTasksActive = computed(
-  () => route.name === 'tasks' && activeDirectionId.value === null && route.query.all !== '1',
+  () =>
+    route.name === 'tasks' &&
+    activeDirectionId.value === null &&
+    route.query.all !== '1' &&
+    route.query.private !== '1',
 )
+const isPrivateActive = computed(() => route.name === 'tasks' && route.query.private === '1')
 const isAllTasksActive = computed(() => route.name === 'tasks' && route.query.all === '1')
 
 const countsByDirectionId = computed(() => {
   const counts = new Map()
   for (const task of tasksStore.tasks) {
+    if (!task.direction) continue // личное поручение — вне направлений
     const id = task.direction.id
     counts.set(id, (counts.get(id) ?? 0) + 1)
   }
   return counts
 })
 
+function goToHome() {
+  router.push({ name: 'home' })
+}
+
 function goToMyTasks() {
   router.push({ name: 'tasks' })
 }
 
+function goToPrivate() {
+  router.push({ name: 'tasks', query: { private: '1' } })
+}
+
 function goToAllTasks() {
   router.push({ name: 'tasks', query: { all: '1' } })
+}
+
+function goToMyDay() {
+  router.push({ name: 'my-day' })
 }
 
 function goToCalendar() {
@@ -103,6 +138,14 @@ function handleLogout() {
       <div class="nav-section__label">Общее</div>
       <button
         class="nav-item"
+        :class="{ 'nav-item--active': route.name === 'home' }"
+        @click="goToHome"
+      >
+        <span class="nav-item__dot nav-item__dot--all" />
+        <span class="nav-item__name">Главная</span>
+      </button>
+      <button
+        class="nav-item"
         :class="{ 'nav-item--active': isMyTasksActive }"
         @click="goToMyTasks"
       >
@@ -118,6 +161,25 @@ function handleLogout() {
         <span class="nav-item__dot nav-item__dot--all" />
         <span class="nav-item__name">Все ТЗ</span>
         <span class="nav-item__count">{{ totalCount }}</span>
+      </button>
+      <button
+        v-if="authStore.isLeadership"
+        class="nav-item"
+        :class="{ 'nav-item--active': isPrivateActive }"
+        @click="goToPrivate"
+      >
+        <span class="nav-item__dot nav-item__dot--all" />
+        <span class="nav-item__name">Поручения</span>
+        <BaseIcon class="nav-item__lock" name="lock" :size="14" title="Видят автор, исполнитель, админы и секретарь" />
+        <span class="nav-item__count">{{ privateCount }}</span>
+      </button>
+      <button
+        class="nav-item"
+        :class="{ 'nav-item--active': route.name === 'my-day' }"
+        @click="goToMyDay"
+      >
+        <span class="nav-item__dot nav-item__dot--all" />
+        <span class="nav-item__name">Мой день</span>
       </button>
       <button
         class="nav-item"
@@ -144,7 +206,7 @@ function handleLogout() {
       >
         <span class="nav-item__dot nav-item__dot--all" />
         <span class="nav-item__name">Таймлайн руководства</span>
-        <span class="nav-item__lock" title="Только для руководителей">🔒</span>
+        <BaseIcon class="nav-item__lock" name="lock" :size="14" title="Только для руководителей" />
       </button>
       <button
         v-if="authStore.isZavod"
@@ -154,7 +216,7 @@ function handleLogout() {
       >
         <span class="nav-item__dot nav-item__dot--all" />
         <span class="nav-item__name">ZAVOD</span>
-        <span class="nav-item__lock" title="Доступ по списку">🔒</span>
+        <BaseIcon class="nav-item__lock" name="lock" :size="14" title="Доступ по списку" />
       </button>
       <button
         v-if="authStore.isAdmin"
@@ -164,6 +226,40 @@ function handleLogout() {
       >
         <span class="nav-item__dot nav-item__dot--all" />
         <span class="nav-item__name">Пользователи</span>
+      </button>
+      <button
+        class="nav-item"
+        :class="{ 'nav-item--active': route.name?.startsWith('survey') }"
+        @click="router.push({ name: 'surveys' })"
+      >
+        <span class="nav-item__dot nav-item__dot--all" />
+        <span class="nav-item__name">Анкеты</span>
+      </button>
+      <button
+        v-if="authStore.isAdmin"
+        class="nav-item"
+        :class="{ 'nav-item--active': route.name === 'broadcast' }"
+        @click="router.push({ name: 'broadcast' })"
+      >
+        <span class="nav-item__dot nav-item__dot--all" />
+        <span class="nav-item__name">Рассылка</span>
+      </button>
+      <button
+        v-if="authStore.isAdmin"
+        class="nav-item"
+        :class="{ 'nav-item--active': route.name === 'checklists' }"
+        @click="router.push({ name: 'checklists' })"
+      >
+        <span class="nav-item__dot nav-item__dot--all" />
+        <span class="nav-item__name">Чек-листы</span>
+      </button>
+      <button
+        class="nav-item"
+        :class="{ 'nav-item--active': route.name === 'games' || route.name === 'durak' }"
+        @click="router.push({ name: 'games' })"
+      >
+        <span class="nav-item__dot nav-item__dot--all" />
+        <span class="nav-item__name">Игры</span>
       </button>
     </div>
 
@@ -187,7 +283,10 @@ function handleLogout() {
       </button>
     </div>
 
-    <PushToggle class="sidebar-push" />
+    <div v-if="!inTelegram" class="sidebar-push">
+      <PushToggle />
+      <TelegramLink />
+    </div>
 
     <div class="user-footer">
       <div class="user-footer__avatar" :style="{ background: getAvatarColor(authStore.user?.id) }">
@@ -197,7 +296,9 @@ function handleLogout() {
         <div class="user-footer__name">{{ authStore.user?.full_name }}</div>
         <div class="user-footer__role">{{ ROLE_LABELS[authStore.user?.role] ?? authStore.user?.role }}</div>
       </div>
-      <button class="user-footer__logout" title="Выйти" @click="handleLogout">⏻</button>
+      <button class="user-footer__logout" title="Выйти" aria-label="Выйти" @click="handleLogout">
+        <BaseIcon name="logout" :size="18" />
+      </button>
     </div>
   </aside>
 </template>
@@ -228,7 +329,7 @@ function handleLogout() {
   width: 38px;
   height: 38px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--surface-raised);
   color: var(--text-muted);
   transition: color 0.15s ease, border-color 0.15s ease;
@@ -259,7 +360,7 @@ function handleLogout() {
   height: 28px;
   flex-shrink: 0;
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
   transition: color 0.15s ease, background 0.15s ease;
@@ -294,9 +395,9 @@ function handleLogout() {
 }
 
 .nav-section__label {
-  font-size: 11px;
+  font: 500 11px/14px var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
   padding: 0 10px 6px;
 }
@@ -309,7 +410,8 @@ function handleLogout() {
   border: none;
   background: transparent;
   color: var(--text);
-  padding: 8px 10px;
+  min-height: var(--control-h);
+  padding: 0 10px;
   border-radius: 8px;
   font-size: 14px;
   text-align: left;
@@ -332,6 +434,7 @@ function handleLogout() {
 .nav-item--active {
   background: var(--accent-soft);
   color: var(--text);
+  font-weight: 500;
 }
 
 .nav-item__dot {
@@ -343,8 +446,7 @@ function handleLogout() {
 }
 
 .nav-item__lock {
-  font-size: 11px;
-  opacity: 0.7;
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -371,6 +473,7 @@ function handleLogout() {
 }
 
 .nav-item__count {
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-muted);
   background: var(--surface-raised);
@@ -380,6 +483,9 @@ function handleLogout() {
 
 .sidebar-push {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .user-footer {
@@ -422,10 +528,15 @@ function handleLogout() {
 }
 
 .user-footer__logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
   border: none;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 16px;
   cursor: pointer;
   flex-shrink: 0;
 }

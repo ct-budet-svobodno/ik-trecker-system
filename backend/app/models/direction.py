@@ -10,6 +10,14 @@ direction_heads = Table(
     Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
 )
 
+# Где человек состоит (их может быть несколько) — не путать с руководством выше.
+direction_members = Table(
+    "direction_members",
+    Base.metadata,
+    Column("direction_id", ForeignKey("directions.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+)
+
 
 class Direction(Base):
     __tablename__ = "directions"

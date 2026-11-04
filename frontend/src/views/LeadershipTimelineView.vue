@@ -147,7 +147,7 @@ function closeModal() {
       <div class="app-main__header">
         <div>
           <p class="breadcrumb">ИК · ТРЕКЕР / ТАЙМЛАЙН РУКОВОДСТВА</p>
-          <h1>ТАЙМЛАЙН РУКОВОДСТВА</h1>
+          <h1>Таймлайн руководства</h1>
           <p class="subtitle">
             Задачи по направлениям и дням. Видно только руководству и руководителям направлений.
           </p>
@@ -228,45 +228,13 @@ function closeModal() {
 </template>
 
 <style scoped>
-.app-layout {
-  display: flex;
-  min-height: 100vh;
-}
-
-.app-main {
-  flex-grow: 1;
-  padding: 28px 32px;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
 .app-main__header {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
   flex-wrap: wrap;
   margin-bottom: 20px;
-}
-
-.breadcrumb {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--text-faint);
-  margin: 0 0 6px;
-}
-
-.app-main__header h1 {
-  margin: 0;
-  font-size: 22px;
-  letter-spacing: 0.02em;
-}
-
-.subtitle {
-  margin: 6px 0 0;
-  color: var(--text-muted);
-  font-size: 13px;
-  max-width: 520px;
 }
 
 .weeknav {
@@ -302,11 +270,11 @@ function closeModal() {
 
 .grid {
   display: grid;
-  grid-template-columns: 130px repeat(7, minmax(150px, 1fr));
+  grid-template-columns: 168px repeat(7, minmax(150px, 1fr));
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
   min-width: 900px;
 }
@@ -376,7 +344,7 @@ function closeModal() {
 
 .cell {
   background: var(--bg);
-  min-height: 64px;
+  min-height: 72px;
   padding: 6px;
   display: flex;
   flex-direction: column;
@@ -408,7 +376,7 @@ function closeModal() {
 .note {
   text-align: left;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--surface-raised);
   color: var(--text);
   padding: 6px 8px;
@@ -431,7 +399,7 @@ function closeModal() {
 }
 
 .note__title {
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.35;
 }
 
@@ -441,7 +409,7 @@ function closeModal() {
 }
 
 .note__done {
-  font-size: 10px;
+  font-size: 11px;
   font-style: italic;
   color: var(--status-done);
 }
@@ -467,12 +435,9 @@ function closeModal() {
   }
 
   .grid-wrap {
-    margin: 0 -14px;
-    padding: 0 14px;
+    margin: 0 -16px;
+    padding: 0 16px;
   }
 
-  .app-main__header h1 {
-    font-size: 19px;
-  }
 }
 </style>

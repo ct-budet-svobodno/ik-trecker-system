@@ -58,7 +58,7 @@ async function toggle() {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-muted);
-  border-radius: 9px;
+  border-radius: 8px;
   padding: 8px 10px;
   font-size: 13px;
   text-align: left;

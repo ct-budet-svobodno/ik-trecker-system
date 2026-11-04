@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 
 import { fetchDirections } from '../api/directions'
-import { fetchTasks, updateTask } from '../api/tasks'
+import { deleteTask, fetchTasks, remindTask, updateTask } from '../api/tasks'
 
 export const useTasksStore = defineStore('tasks', {
   state: () => ({
@@ -30,6 +30,31 @@ export const useTasksStore = defineStore('tasks', {
 
     addTask(task) {
       this.tasks.unshift(task)
+    },
+
+    // Правка ТЗ/поручения целиком (форма «Изменить»).
+    async updateFields(taskId, payload) {
+      const updated = await updateTask(taskId, payload)
+      const task = this.tasks.find((t) => t.id === taskId)
+      if (task) Object.assign(task, updated)
+      return updated
+    },
+
+    async removeTask(taskId) {
+      await deleteTask(taskId)
+      this.tasks = this.tasks.filter((t) => t.id !== taskId)
+    },
+
+    // Счётчик комментариев на карточке — без перезагрузки всего списка.
+    setCommentsCount(taskId, count) {
+      const task = this.tasks.find((t) => t.id === taskId)
+      if (task) task.comments_count = count
+    },
+
+    async remind(taskId) {
+      const updated = await remindTask(taskId)
+      const task = this.tasks.find((t) => t.id === taskId)
+      if (task) Object.assign(task, updated)
     },
 
     async setTaskStatus(taskId, status) {

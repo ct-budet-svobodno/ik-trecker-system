@@ -2,12 +2,17 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     auth,
+    broadcasts,
+    checklists,
     directions,
     editorial_posts,
     events,
+    games,
     leadership_notes,
     leadership_tasks,
+    personal_todos,
     push,
+    surveys,
     tasks,
     users,
     zavod,
@@ -28,5 +33,12 @@ api_router.include_router(
 api_router.include_router(
     editorial_posts.router, prefix="/editorial-posts", tags=["editorial-posts"]
 )
+api_router.include_router(
+    personal_todos.router, prefix="/personal-todos", tags=["personal-todos"]
+)
 api_router.include_router(push.router, prefix="/push", tags=["push"])
 api_router.include_router(zavod.router, prefix="/zavod", tags=["zavod"])
+api_router.include_router(games.router, prefix="/games", tags=["games"])
+api_router.include_router(broadcasts.router, prefix="/broadcasts", tags=["broadcasts"])
+api_router.include_router(checklists.router, prefix="/checklists", tags=["checklists"])
+api_router.include_router(surveys.router, prefix="/surveys", tags=["surveys"])

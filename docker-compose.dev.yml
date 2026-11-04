@@ -1,0 +1,66 @@
+# Локальная разработка и тесты. Прод — docker-compose.yml.
+#
+#   docker compose -f docker-compose.dev.yml up --build        # трекер: http://localhost:5180
+#   docker compose -f docker-compose.dev.yml run --rm backend pytest
+#   docker compose -f docker-compose.dev.yml --profile bot up   # + бот (нужен bot/.env)
+#
+# Код подключён томами: бэкенд перезапускается сам (--reload), фронт — Vite с HMR.
+# База — в томе backend_data, не пересекается с продом и с backend/*.db.
+name: ik-tracker-dev
+
+services:
+  backend:
+    build: ./backend
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      # Явно, чтобы не подхватывался backend/.env от запуска без докера.
+      DATABASE_URL: sqlite:////app/data/ik_tracker.db
+      JWT_SECRET_KEY: dev-secret-key
+      CORS_ORIGINS: http://localhost:5180
+      VAPID_PUBLIC_KEY: ""
+      VAPID_PRIVATE_KEY: ""
+      # Токен ТЕСТОВОГО бота (см. bot/.env). Пусто — Telegram выключен.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      WEBAPP_URL: ${WEBAPP_URL:-http://localhost:5180}
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/scripts:/app/scripts
+      - ./backend/tests:/app/tests
+      - backend_data:/app/data
+    ports:
+      - "127.0.0.1:8100:8000"
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    # node_modules живут в томе; после правки package.json:
+    #   docker compose -f docker-compose.dev.yml run --rm frontend npm ci
+    command: sh -c "[ -d node_modules/.bin ] || npm ci; npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_BASE_URL: /api
+      VITE_PROXY_TARGET: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "127.0.0.1:5180:5173"
+    depends_on:
+      - backend
+
+  # Бот (бывший flood). Только с профилем bot и только с токеном ТЕСТОВОГО бота:
+  # с боевым токеном локальный polling выбьет бота на сервере.
+  bot:
+    build: ./bot
+    profiles: ["bot"]
+    env_file:
+      - path: ./bot/.env
+        required: false
+    volumes:
+      - ./bot/database:/app/database
+      - bot_whisper_cache:/app/whisper-cache
+
+volumes:
+  backend_data:
+  frontend_node_modules:
+  bot_whisper_cache:

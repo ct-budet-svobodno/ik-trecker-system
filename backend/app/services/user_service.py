@@ -1,10 +1,12 @@
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
+from app.models.direction import Direction
 from app.models.user import LeadershipPosition, User, UserRole
+from app.models.user_profile import UserProfile
 from app.repositories import user_repository
 from app.schemas.user import UserCreate
-from app.services.exceptions import UsernameTakenError
+from app.services.exceptions import RegistrationError, UsernameTakenError
 
 
 def create_user(db: Session, user_create: UserCreate) -> User:
@@ -29,6 +31,24 @@ def set_role(db: Session, user: User, role: UserRole) -> User:
 
 def set_active(db: Session, user: User, is_active: bool) -> User:
     return user_repository.update(db, user, is_active=is_active)
+
+
+def set_directions(db: Session, user: User, direction_ids: list[int]) -> User:
+    """Направления участника. В анкете направление одно (её читают бот и заявки):
+    если там уже не его направление — ставим первое из новых."""
+    directions = []
+    for direction_id in dict.fromkeys(direction_ids):
+        direction = db.get(Direction, direction_id)
+        if direction is None:
+            raise RegistrationError("Такого направления нет")
+        directions.append(direction)
+    user.directions = directions
+    profile = db.get(UserProfile, user.id)
+    if profile is not None and profile.direction_id not in direction_ids:
+        profile.direction_id = directions[0].id if directions else None
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 def set_password(db: Session, user: User, raw_password: str) -> User:

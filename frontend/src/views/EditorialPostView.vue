@@ -326,14 +326,7 @@ function statusColor(status) {
 </template>
 
 <style scoped>
-.app-layout {
-  display: flex;
-  min-height: 100vh;
-}
-
 .app-main {
-  flex-grow: 1;
-  padding: 28px 32px;
   max-width: 1100px;
 }
 
@@ -365,19 +358,6 @@ function statusColor(status) {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
-}
-
-.breadcrumb {
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: var(--text-faint);
-  margin: 0 0 6px;
-  text-transform: capitalize;
-}
-
-h1 {
-  font-size: 24px;
-  margin: 0;
 }
 
 .card {
@@ -452,11 +432,11 @@ h1 {
 
 .role__select {
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 8px;
   background: var(--surface-raised);
   color: var(--text);
   padding: 5px 8px;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .panels {
@@ -525,7 +505,7 @@ h1 {
 }
 
 .readonly--small {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-muted);
   margin-top: 6px;
 }
@@ -534,7 +514,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13.5px;
+  font-size: 13px;
   margin: 10px 0;
 }
 
@@ -591,11 +571,11 @@ h1 {
 
 .btn-mini {
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   background: var(--accent);
   color: #fff;
   padding: 5px 12px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -614,10 +594,6 @@ h1 {
 }
 
 @media (max-width: 768px) {
-  h1 {
-    font-size: 20px;
-  }
-
   .roles {
     flex-direction: column;
     align-items: stretch;

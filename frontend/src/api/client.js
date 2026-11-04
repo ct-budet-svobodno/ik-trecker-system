@@ -17,7 +17,9 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Вход через Telegram сам разбирается с 401/404 — без принудительного перехода на /login.
+    const isTelegramAuth = error.config?.url?.startsWith('/auth/telegram')
+    if (error.response?.status === 401 && !isTelegramAuth) {
       clearToken()
       if (window.location.pathname !== '/login') {
         window.location.assign('/login')

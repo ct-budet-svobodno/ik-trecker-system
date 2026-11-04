@@ -20,7 +20,7 @@ async function handleSubmit() {
   isSubmitting.value = true
   try {
     await authStore.login(username.value, password.value)
-    router.push(route.query.redirect || { name: 'tasks' })
+    router.push(route.query.redirect || { name: 'home' })
   } catch (err) {
     error.value =
       err.response?.status === 401 ? 'Неверный логин или пароль' : 'Не удалось войти, попробуйте позже'
@@ -171,7 +171,8 @@ async function handleSubmit() {
 }
 
 h1 {
-  font-size: 21px;
+  font: 600 20px/26px var(--font-display);
+  letter-spacing: -0.01em;
   margin: 0 0 4px;
   text-align: center;
 }
@@ -182,6 +183,7 @@ h1 {
   text-align: center;
 }
 
+
 label {
   font-size: 14px;
   color: var(--text-muted);
@@ -191,7 +193,7 @@ label {
 input {
   padding: 11px 12px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 8px;
   margin-top: 4px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -225,7 +227,7 @@ input:focus {
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -249,7 +251,7 @@ button {
   margin-top: 20px;
   padding: 11px 16px;
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   background: linear-gradient(90deg, var(--dir-prod-a), var(--dir-prod-b));
   background-size: 160% 100%;
   background-position: 0% 50%;

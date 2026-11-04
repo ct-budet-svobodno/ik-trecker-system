@@ -1,10 +1,21 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import api_router
 from app.core.config import settings
+from app.services import bot_import_service
 
-app = FastAPI(title="ИК Таск-трекер API")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Анкеты из бота → аккаунты трекера: сразу и дальше по расписанию.
+    bot_import_service.start_background()
+    yield
+
+
+app = FastAPI(title="ИК Таск-трекер API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

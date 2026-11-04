@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 
-import { createEvent, deleteEvent, fetchEvents, updateEvent } from '../api/events'
+import { createEvent, deleteEvent, fetchEvents, setEventRsvp, updateEvent } from '../api/events'
 
 export const useEventsStore = defineStore('events', {
   state: () => ({
@@ -32,6 +32,13 @@ export const useEventsStore = defineStore('events', {
 
     async editEvent(eventId, payload) {
       const updated = await updateEvent(eventId, payload)
+      const index = this.events.findIndex((e) => e.id === eventId)
+      if (index !== -1) this.events[index] = updated
+      return updated
+    },
+
+    async setRsvp(eventId, status) {
+      const updated = await setEventRsvp(eventId, status)
       const index = this.events.findIndex((e) => e.id === eventId)
       if (index !== -1) this.events[index] = updated
       return updated

@@ -98,6 +98,36 @@ def test_troika_can_create_for_any_direction(client, admin_credentials, manager_
     assert _create(client, token, direction.id).status_code == 201
 
 
+def test_position_holder_stays_manager_when_form_sends_employee(
+    client, admin_credentials, employee_credentials
+):
+    admin_token = _login(client, admin_credentials)
+    employee_id = _me_id(client, _login(client, employee_credentials))
+    # Форма админки шлёт роль вместе с должностью — employee не должен затирать повышение.
+    patched = client.patch(
+        f"/api/users/{employee_id}",
+        json={"role": "employee", "leadership_position": "brand_manager"},
+        headers=_auth_headers(admin_token),
+    )
+    assert patched.status_code == 200
+    assert patched.json()["role"] == "manager"
+
+    # Бренд-менеджер видит таймлайн и ставит задачи в строки руководства.
+    token = _login(client, employee_credentials)
+    listed = client.get(
+        "/api/leadership-tasks",
+        params={"date_from": DATE, "date_to": DATE},
+        headers=_auth_headers(token),
+    )
+    assert listed.status_code == 200
+    created = client.post(
+        "/api/leadership-tasks",
+        json={"title": "Гайд по бренду", "position": "brand_manager", "date": DATE},
+        headers=_auth_headers(token),
+    )
+    assert created.status_code == 201
+
+
 def test_troika_position_is_single_holder(client, admin_credentials, manager_credentials):
     admin_token = _login(client, admin_credentials)
     admin_id = _me_id(client, admin_token)

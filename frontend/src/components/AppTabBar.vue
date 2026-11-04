@@ -4,10 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 
 import BaseIcon from './BaseIcon.vue'
 import PushToggle from './PushToggle.vue'
+import TelegramLink from './TelegramLink.vue'
 import { ROLE_LABELS } from '../constants/roleLabels'
 import { useAuthStore } from '../stores/auth'
 import { useTasksStore } from '../stores/tasks'
 import { getAvatarColor, getInitials } from '../utils/avatar'
+import { isTelegram } from '../utils/telegram'
+
+const inTelegram = isTelegram()
 
 const authStore = useAuthStore()
 const tasksStore = useTasksStore()
@@ -21,14 +25,16 @@ watch(() => route.fullPath, () => {
   sheetOpen.value = false
 })
 
+const isHomeActive = computed(() => route.name === 'home')
 const isTasksActive = computed(() => route.name === 'tasks')
-const isCalendarActive = computed(() => route.name === 'calendar')
+const isMyDayActive = computed(() => route.name === 'my-day')
 const isEditorialActive = computed(
   () => route.name === 'editorial' || route.name === 'editorial-post',
 )
 // «Ещё» активна, когда открыт раздел из шторки.
 const isMoreActive = computed(() =>
-  ['leadership-timeline', 'zavod', 'users'].includes(route.name),
+  ['calendar', 'leadership-timeline', 'zavod', 'users', 'broadcast', 'checklists', 'games', 'durak'].includes(route.name) ||
+    route.name?.startsWith('survey'),
 )
 
 // query по умолчанию пустой: таб «Задачи» всегда сбрасывает на «Мои задачи».
@@ -52,16 +58,22 @@ function handleLogout() {
 
 <template>
   <nav class="tabbar" aria-label="Основная навигация">
+    <button class="tab" :class="{ 'tab--active': isHomeActive }" @click="go('home')">
+      <span class="tab__indicator" />
+      <BaseIcon name="home" :size="21" />
+      <span class="tab__label">Главная</span>
+    </button>
+
+    <button class="tab" :class="{ 'tab--active': isMyDayActive }" @click="go('my-day')">
+      <span class="tab__indicator" />
+      <BaseIcon name="checklist" :size="21" />
+      <span class="tab__label">Мой день</span>
+    </button>
+
     <button class="tab" :class="{ 'tab--active': isTasksActive }" @click="go('tasks')">
       <span class="tab__indicator" />
       <BaseIcon name="columns" :size="21" />
       <span class="tab__label">Задачи</span>
-    </button>
-
-    <button class="tab" :class="{ 'tab--active': isCalendarActive }" @click="go('calendar')">
-      <span class="tab__indicator" />
-      <BaseIcon name="calendar" :size="21" />
-      <span class="tab__label">Календарь</span>
     </button>
 
     <button
@@ -89,22 +101,39 @@ function handleLogout() {
         <span class="sheet__grip" />
 
         <div class="sheet__section">
+          <button class="sheet-item" @click="go('calendar')">Календарь</button>
           <button class="sheet-item" @click="go('tasks', { all: '1' })">Все ТЗ</button>
+          <button
+            v-if="authStore.isLeadership"
+            class="sheet-item"
+            @click="go('tasks', { private: '1' })"
+          >
+            Поручения
+            <BaseIcon class="sheet-item__lock" name="lock" :size="14" />
+          </button>
           <button
             v-if="authStore.isManagerOrAdmin"
             class="sheet-item"
             @click="go('leadership-timeline')"
           >
             Таймлайн руководства
-            <span class="sheet-item__lock">🔒</span>
+            <BaseIcon class="sheet-item__lock" name="lock" :size="14" />
           </button>
           <button v-if="authStore.isZavod" class="sheet-item" @click="go('zavod')">
             ZAVOD
-            <span class="sheet-item__lock">🔒</span>
+            <BaseIcon class="sheet-item__lock" name="lock" :size="14" />
           </button>
           <button v-if="authStore.isAdmin" class="sheet-item" @click="go('users')">
             Пользователи
           </button>
+          <button class="sheet-item" @click="go('surveys')">Анкеты</button>
+          <button v-if="authStore.isAdmin" class="sheet-item" @click="go('broadcast')">
+            Рассылка
+          </button>
+          <button v-if="authStore.isAdmin" class="sheet-item" @click="go('checklists')">
+            Чек-листы
+          </button>
+          <button class="sheet-item" @click="go('games')">Игры</button>
         </div>
 
         <div v-if="tasksStore.directions.length" class="sheet__section">
@@ -122,8 +151,10 @@ function handleLogout() {
           </div>
         </div>
 
-        <div class="sheet__section">
+        <!-- В мини-аппе уведомления шлёт бот — браузерные пуши там не нужны. -->
+        <div v-if="!inTelegram" class="sheet__section sheet__notify">
           <PushToggle />
+          <TelegramLink />
         </div>
 
         <div class="sheet__user">
@@ -211,7 +242,7 @@ function handleLogout() {
 }
 
 .tab__label {
-  font-size: 10.5px;
+  font-size: 11px;
   letter-spacing: 0.01em;
 }
 
@@ -234,7 +265,7 @@ function handleLogout() {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border-strong);
-  border-radius: 20px 20px 0 0;
+  border-radius: 18px 18px 0 0;
   padding: 10px 16px calc(18px + env(safe-area-inset-bottom));
   animation: sheet-up 0.24s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -263,6 +294,12 @@ function handleLogout() {
   padding: 4px 0 10px;
 }
 
+.sheet__notify {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .sheet__section + .sheet__section {
   border-top: 1px solid var(--border);
   padding-top: 12px;
@@ -279,7 +316,7 @@ function handleLogout() {
   text-align: left;
   font-size: 15px;
   padding: 12px 6px;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .sheet-item:active {
@@ -287,8 +324,7 @@ function handleLogout() {
 }
 
 .sheet-item__lock {
-  font-size: 11px;
-  opacity: 0.7;
+  color: var(--text-muted);
 }
 
 .sheet__label {
@@ -383,7 +419,7 @@ function handleLogout() {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--danger);
-  border-radius: 9px;
+  border-radius: 8px;
   padding: 8px 14px;
   font-size: 13px;
 }

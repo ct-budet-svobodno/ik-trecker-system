@@ -1,10 +1,11 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import AppLoader from '../components/AppLoader.vue'
 import AppSidebar from '../components/AppSidebar.vue'
+import RegistrationsPanel from '../components/RegistrationsPanel.vue'
 import { fetchDirections, setDirectionHeads } from '../api/directions'
-import { createUser, fetchUsers, updateUser } from '../api/users'
+import { createUser, fetchUsers, importFromBot, updateUser } from '../api/users'
 import { LEADERSHIP_POSITION_LABELS, ROLE_LABELS } from '../constants/roleLabels'
 import { getAvatarColor, getInitials } from '../utils/avatar'
 
@@ -19,6 +20,65 @@ const errorMessage = ref('')
 // short_code направлений, где пользователь — руководитель.
 function headedDirections(user) {
   return directions.value.filter((d) => d.heads.some((h) => h.id === user.id))
+}
+
+// Направления, где человек состоит (их может быть несколько).
+function memberDirections(user) {
+  return directions.value.filter((d) => user.direction_ids.includes(d.id))
+}
+
+// --- Фильтры списка ---
+const aktivFilter = ref('all') // all | yes | no
+const directionFilter = ref('') // '' — все, 'none' — без направления, иначе id
+const aktivCount = computed(() => users.value.filter((u) => u.is_activist).length)
+
+const filteredUsers = computed(() =>
+  users.value.filter((u) => {
+    if (aktivFilter.value === 'yes' && !u.is_activist) return false
+    if (aktivFilter.value === 'no' && u.is_activist) return false
+    if (directionFilter.value === 'none') return !u.direction_ids.length
+    if (directionFilter.value) return u.direction_ids.includes(Number(directionFilter.value))
+    return true
+  }),
+)
+
+// Галочка «в активе» прямо в таблице: клик — сразу сохранили.
+const togglingIds = ref(new Set())
+
+async function toggleAktiv(user) {
+  if (togglingIds.value.has(user.id)) return
+  togglingIds.value.add(user.id)
+  const next = !user.is_activist
+  user.is_activist = next
+  try {
+    await updateUser(user.id, { is_activist: next })
+  } catch (err) {
+    user.is_activist = !next
+    errorMessage.value = err.response?.data?.detail ?? 'Не удалось сохранить отметку актива'
+  } finally {
+    togglingIds.value.delete(user.id)
+  }
+}
+
+// --- Анкеты из бота ---
+// Фоновая синхронизация и так подтягивает их раз в 10 минут; кнопка — «сейчас».
+const importing = ref(false)
+const importResult = ref('')
+
+async function runImport() {
+  importing.value = true
+  importResult.value = ''
+  try {
+    const report = await importFromBot()
+    importResult.value = report.created
+      ? `Заведено из бота: ${report.created} — ${report.names.join(', ')}`
+      : 'Все из анкет бота уже в трекере'
+    if (report.created || report.linked) await load()
+  } catch (err) {
+    importResult.value = err.response?.data?.detail ?? 'Не удалось подтянуть анкеты'
+  } finally {
+    importing.value = false
+  }
 }
 
 // --- Создание ---
@@ -86,6 +146,8 @@ function openEdit(user) {
     is_active: user.is_active,
     is_editorial: user.is_editorial,
     is_zavod: user.is_zavod,
+    is_activist: user.is_activist,
+    memberIds: [...user.direction_ids],
     password: '',
     // id направлений, где он руководитель (для чекбоксов).
     directionIds: headedDirections(user).map((d) => d.id),
@@ -108,6 +170,8 @@ async function submitEdit() {
       is_active: e.is_active,
       is_editorial: e.is_editorial,
       is_zavod: e.is_zavod,
+      is_activist: e.is_activist,
+      direction_ids: e.memberIds,
       leadership_position: e.leadership_position || null,
     }
     if (e.password) payload.password = e.password
@@ -142,12 +206,19 @@ async function submitEdit() {
       <div class="app-main__header">
         <div>
           <p class="breadcrumb">ИК · ТРЕКЕР / ПОЛЬЗОВАТЕЛИ</p>
-          <h1>ПОЛЬЗОВАТЕЛИ</h1>
+          <h1>Пользователи</h1>
           <p class="subtitle">Создавайте аккаунты, выдавайте роли и должности, меняйте пароли.</p>
         </div>
+        <button class="import-btn" :disabled="importing" @click="runImport">
+          {{ importing ? 'Подтягиваем…' : 'Подтянуть из бота' }}
+        </button>
       </div>
+      <p v-if="importResult" class="alert import-result">{{ importResult }}</p>
 
       <p v-if="errorMessage" class="alert alert--error">{{ errorMessage }}</p>
+
+      <!-- Заявки из мини-аппа: принятые сразу появляются в списке ниже -->
+      <RegistrationsPanel @approved="load" />
 
       <!-- Создание -->
       <section class="card create">
@@ -177,16 +248,37 @@ async function submitEdit() {
       </section>
 
       <!-- Список -->
+      <div v-if="!isLoading" class="filters">
+        <div class="seg">
+          <button :class="{ 'seg__btn--on': aktivFilter === 'all' }" class="seg__btn" @click="aktivFilter = 'all'">
+            Все · {{ users.length }}
+          </button>
+          <button :class="{ 'seg__btn--on': aktivFilter === 'yes' }" class="seg__btn" @click="aktivFilter = 'yes'">
+            В активе · {{ aktivCount }}
+          </button>
+          <button :class="{ 'seg__btn--on': aktivFilter === 'no' }" class="seg__btn" @click="aktivFilter = 'no'">
+            Не в активе · {{ users.length - aktivCount }}
+          </button>
+        </div>
+        <select v-model="directionFilter" class="filters__dir">
+          <option value="">Все направления</option>
+          <option v-for="d in directions" :key="d.id" :value="String(d.id)">{{ d.name }}</option>
+          <option value="none">Без направления</option>
+        </select>
+        <span class="muted muted--small">Показано: {{ filteredUsers.length }}</span>
+      </div>
       <AppLoader v-if="isLoading" />
       <div v-else class="card table-card">
         <table class="utable">
           <thead>
             <tr>
               <th>Пользователь</th>
+              <th>Актив</th>
+              <th>Направления</th>
               <th>Логин</th>
               <th>Роль</th>
               <th>Должность</th>
-              <th>Направления</th>
+              <th>Руководит</th>
               <th>Редакция</th>
               <th>ZAVOD</th>
               <th>Статус</th>
@@ -194,7 +286,7 @@ async function submitEdit() {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="user in users" :key="user.id" :class="{ 'row--inactive': !user.is_active }">
+            <tr v-for="user in filteredUsers" :key="user.id" :class="{ 'row--inactive': !user.is_active }">
               <td>
                 <span class="u">
                   <span class="u__avatar" :style="{ background: getAvatarColor(user.id) }">
@@ -202,6 +294,26 @@ async function submitEdit() {
                   </span>
                   {{ user.full_name }}
                 </span>
+              </td>
+              <td>
+                <button
+                  type="button"
+                  class="aktiv-toggle"
+                  :class="{ 'aktiv-toggle--on': user.is_activist }"
+                  :disabled="togglingIds.has(user.id)"
+                  :aria-pressed="user.is_activist"
+                  @click="toggleAktiv(user)"
+                >
+                  {{ user.is_activist ? 'В активе' : 'Нет' }}
+                </button>
+              </td>
+              <td>
+                <span v-if="user.direction_ids.length" class="dir-codes">
+                  <span v-for="d in memberDirections(user)" :key="d.id" class="dir-code">
+                    {{ d.short_code }}
+                  </span>
+                </span>
+                <span v-else class="muted muted--small">—</span>
               </td>
               <td class="mono">{{ user.username }}</td>
               <td>{{ ROLE_LABELS[user.role] ?? user.role }}</td>
@@ -263,6 +375,19 @@ async function submitEdit() {
           </div>
         </div>
 
+        <label class="modal__check">
+          <input v-model="editing.is_activist" type="checkbox" />
+          В активе
+        </label>
+
+        <label>Состоит в направлениях</label>
+        <div class="dir-picker">
+          <label v-for="d in directions" :key="d.id" class="dir-opt">
+            <input v-model="editing.memberIds" type="checkbox" :value="d.id" />
+            {{ d.short_code }}
+          </label>
+        </div>
+
         <label>Руководитель направлений</label>
         <div class="dir-picker">
           <label v-for="d in directions" :key="d.id" class="dir-opt">
@@ -308,39 +433,32 @@ async function submitEdit() {
 </template>
 
 <style scoped>
-.app-layout {
-  display: flex;
-  min-height: 100vh;
-}
-
-.app-main {
-  flex-grow: 1;
-  padding: 28px 32px;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
 .app-main__header {
   margin-bottom: 22px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
-.breadcrumb {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--text-faint);
-  margin: 0 0 6px;
+.import-btn {
+  height: var(--control-h);
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
 }
 
-h1 {
-  font-size: 22px;
-  margin: 0;
-  letter-spacing: 0.02em;
+.import-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
 }
 
-.subtitle {
-  color: var(--text-muted);
-  margin: 6px 0 0;
-  font-size: 13px;
+.import-result {
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
 }
 
 .muted {
@@ -424,16 +542,13 @@ h1 {
 
 .table-card {
   padding: 6px 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 @media (max-width: 768px) {
-  .table-card {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
   .utable {
-    min-width: 800px;
+    min-width: 960px;
   }
 }
 
@@ -454,7 +569,7 @@ h1 {
 .utable td {
   padding: 10px 12px;
   border-top: 1px solid var(--border);
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .row--inactive {
@@ -481,7 +596,7 @@ h1 {
 
 .mono {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
@@ -503,8 +618,77 @@ h1 {
   font-size: 11px;
   background: var(--surface-raised);
   color: var(--text-muted);
-  border-radius: 5px;
+  border-radius: 6px;
   padding: 1px 6px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.seg__btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.seg__btn + .seg__btn {
+  border-left: 1px solid var(--border);
+}
+
+.seg__btn--on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.filters__dir {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.aktiv-toggle {
+  font-size: 12px;
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--text-faint);
+  border-radius: 6px;
+  padding: 3px 9px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.aktiv-toggle:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+.aktiv-toggle--on {
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--success) 20%, transparent);
+  color: var(--success);
+}
+.aktiv-toggle--on:hover:not(:disabled) {
+  color: var(--success);
+  border-color: var(--success);
+}
+.aktiv-toggle:disabled {
+  opacity: 0.6;
 }
 
 .edit-chip {
@@ -551,11 +735,11 @@ h1 {
 
 .status-on {
   color: var(--status-done);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .status-off {
   color: var(--text-faint);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .error {

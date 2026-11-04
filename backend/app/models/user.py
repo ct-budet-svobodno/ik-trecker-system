@@ -1,8 +1,8 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -11,6 +11,15 @@ class UserRole(str, enum.Enum):
     ADMIN = "admin"
     MANAGER = "manager"
     EMPLOYEE = "employee"
+
+
+class RegistrationStatus(str, enum.Enum):
+    """Заявка из мини-аппа: человек заполнил анкету и ждёт решения админа.
+    Заведённые админом аккаунты — сразу APPROVED."""
+
+    APPROVED = "approved"
+    PENDING = "pending"
+    REJECTED = "rejected"
 
 
 class LeadershipPosition(str, enum.Enum):
@@ -40,4 +49,27 @@ class User(Base):
     # Доступ к разделу ZAVOD (доска тем). Ставит флаг админ; сверх этого раздел
     # видят админы и руководство — см. геттер isZavod на фронте.
     is_zavod: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # В активе ИК (галочка в «Пользователях»). Ставится сам, когда человек
+    # заполнил анкету — в мини-аппе или в боте.
+    is_activist: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Направления, в которых человек состоит (может быть несколько; не путать
+    # с руководством — direction_heads). Из анкеты, правит админ.
+    directions: Mapped[list["Direction"]] = relationship(  # noqa: F821
+        secondary="direction_members", order_by="Direction.sort_order", lazy="selectin"
+    )
+    # Привязанный Telegram-аккаунт: вход в мини-апп без пароля и уведомления от бота.
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, nullable=True)
+    telegram_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Пока заявка не одобрена, is_active=False — вход и назначения закрыты.
+    registration_status: Mapped[RegistrationStatus] = mapped_column(
+        Enum(RegistrationStatus), nullable=False, default=RegistrationStatus.APPROVED
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    @property
+    def direction_ids(self) -> list[int]:
+        return [d.id for d in self.directions]
+
+    @property
+    def telegram_linked(self) -> bool:
+        return self.telegram_id is not None

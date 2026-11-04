@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.repositories import push_subscription_repository
+from app.services import telegram_service
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,9 @@ def _send_batch(subs: list[dict], payload: str) -> None:
 
 
 def send_to_users(db: Session, user_ids: list[int], *, title: str, body: str, url: str) -> None:
-    """Отправить пуш всем подпискам перечисленных пользователей (не блокируя запрос)."""
+    """Отправить уведомление перечисленным пользователям (не блокируя запрос):
+    сообщением от Telegram-бота тем, кто его привязал, и web push в браузер."""
+    telegram_service.send_to_users(db, user_ids, title=title, body=body, url=url)
     if not push_enabled():
         return
     subs = []

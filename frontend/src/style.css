@@ -22,6 +22,10 @@
   --success-hover: #22b8a4;
   --danger: #f87171;
 
+  /* «Приду / Не приду» в календаре */
+  --rsvp-yes: #22c55e;
+  --rsvp-no: #ef4444;
+
   /* Семантика статусов (десатурировано) */
   --status-todo: #908ca0;
   --status-progress: #e0a85e;
@@ -43,11 +47,35 @@
   --dir-prod-b: #18b1ad;
   --dir-prod: linear-gradient(135deg, var(--dir-prod-a), var(--dir-prod-b));
 
-  /* Типографика */
-  --font-sans: system-ui, 'Segoe UI', sans-serif;
+  /* Типографика: текст, заголовок страницы, служебные надписи и цифры */
+  --font-sans: 'Golos Text', system-ui, 'Segoe UI', sans-serif;
+  --font-display: 'Unbounded', 'Golos Text', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', 'SF Mono', ui-monospace, monospace;
 
-  font: 16px/1.5 var(--font-sans);
+  /* Отступы (шаг 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Радиусы: чипы → контролы → карточки → шторка */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 18px;
+  --radius-full: 999px;
+
+  /* Размеры */
+  --control-h: 36px;
+  --control-h-touch: 44px;
+  --shadow-lift: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --on-success: #0c1410;
+
+  font: 14px/1.5 var(--font-sans);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -57,19 +85,35 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Подложка под «отскоком» прокрутки (iOS, WebView Telegram) — тон фона. */
+  background-color: #0a0a0c;
+}
+
+/* Без своего фона: при фоне у html фон body рисуется поверх слоя z-index: -1
+   (body::before ниже) и закрыл бы свечения. */
 body {
   margin: 0;
-  /* Единый фон — корп-айдентика ИК: тёмная база и свечения фирменных цветов
-     (малиновый слева, тёплый оранжевый снизу, бирюзовый справа) + бумажное зерно. */
-  background-color: #0a0a0c;
+  min-height: 100vh;
+}
+
+/* Единый фон — корп-айдентика ИК: тёмная база и свечения фирменных цветов
+   (малиновый слева, тёплый оранжевый снизу, бирюзовый справа) + бумажное зерно.
+   Отдельным фиксированным слоем, а не фоном body: background-attachment: fixed
+   не работает на iOS, и свечения растягивались по длинной странице — снизу при
+   прокрутке оставалась голая чёрная подложка. Слой всегда ровно в экран. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image:
     radial-gradient(65% 85% at -5% 55%,  rgba(201, 51, 54, 0.55)  0%, rgba(201, 51, 54, 0)  60%),
     radial-gradient(62% 68% at 42% 108%, rgba(232, 134, 60, 0.52) 0%, rgba(232, 134, 60, 0) 60%),
     radial-gradient(65% 90% at 105% 60%, rgba(38, 176, 150, 0.50) 0%, rgba(38, 176, 150, 0) 62%),
     url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
   background-repeat: no-repeat, no-repeat, no-repeat, repeat;
-  background-attachment: fixed;
-  min-height: 100vh;
 }
 
 #app {
@@ -113,6 +157,65 @@ select {
   color: var(--text);
 }
 
+/* ---------- Каркас страницы (общий для всех вью) ---------- */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-main {
+  flex-grow: 1;
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--space-8);
+  overflow-x: hidden;
+}
+
+/* Единственный капс-уровень в интерфейсе. */
+.breadcrumb {
+  font: 500 11px/14px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-2);
+}
+
+.app-main h1 {
+  font: 500 24px/30px var(--font-display);
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.subtitle {
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--text-muted);
+  margin: var(--space-2) 0 0;
+  max-width: 60ch;
+}
+
+/* Главное действие страницы — одна кнопка на экран. */
+.create-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--control-h);
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--success);
+  color: var(--on-success);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.create-btn:hover {
+  background: var(--success-hover);
+}
+
 /* Тонкие тёмные скроллбары под тему. */
 * {
   scrollbar-width: thin;
@@ -142,16 +245,23 @@ select {
 
 /* ---------- Мобильный слой (≤768px) ---------- */
 @media (max-width: 768px) {
-  /* iOS Safari игнорирует background-attachment: fixed — свечения растягиваются. */
   body {
-    background-attachment: scroll;
     min-height: 100dvh;
   }
 
   /* Отступы контента + место под нижний таб-бар.
      !important — чтобы перебить scoped-стили каждой вью одним правилом. */
   .app-main {
-    padding: 18px 14px calc(88px + env(safe-area-inset-bottom)) !important;
+    padding: 18px var(--space-4) calc(88px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .app-main h1 {
+    font-size: 20px;
+    line-height: 26px;
+  }
+
+  .create-btn {
+    height: var(--control-h-touch);
   }
 
   /* Модалки превращаются в нижние «шторки» (закрываются смахиванием вниз —
@@ -164,7 +274,7 @@ select {
 
   .modal {
     max-width: none !important;
-    border-radius: 18px 18px 0 0 !important;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0 !important;
     border-bottom: none !important;
     max-height: 92dvh;
     overflow-y: auto;
@@ -182,6 +292,15 @@ select {
     border-radius: 999px;
     background: var(--border-strong);
     margin-bottom: 8px;
+  }
+}
+
+/* iOS увеличивает страницу при фокусе в поле с текстом мельче 16px. */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }
 

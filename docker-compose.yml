@@ -11,8 +11,20 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8084}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      # Telegram-бот и мини-апп (пусто = выключено, веб работает как обычно)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      WEBAPP_URL: ${WEBAPP_URL:-https://rezonans26.ru}
+      # Чат актива для приглашений в игры (бот должен в нём состоять). Пусто — без кнопки «Позвать в чат».
+      TELEGRAM_GAMES_CHAT_ID: ${TELEGRAM_GAMES_CHAT_ID:-}
+      # Группа-архив для анкет новых участников с фото (бот должен в ней состоять).
+      # Пусто — анкеты видны только админам в трекере.
+      TELEGRAM_ANKETA_CHAT_ID: ${TELEGRAM_ANKETA_CHAT_ID:-}
+      # База бота flood: одобренные анкеты из мини-аппа дописываются туда (для !инфо).
+      # На сервере в .env: BOT_DATA_DIR=/root/flood/database, BOT_DB_PATH=/bot-data/bot.db.
+      BOT_DB_PATH: ${BOT_DB_PATH:-}
     volumes:
       - backend_data:/app/data
+      - ${BOT_DATA_DIR:-./bot/database}:/bot-data
     ports:
       # Только для отладки с самого сервера (Swagger: http://127.0.0.1:8100/docs)
       - "127.0.0.1:8100:8000"
@@ -23,6 +35,10 @@ services:
       retries: 5
       start_period: 15s
 
+  # Своего процесса бота у трекера нет: токен общий с ботом flood, а getUpdates
+  # у одного токена может слушать только один процесс. Бэкенд по токену лишь
+  # шлёт уведомления и проверяет вход из мини-аппа.
+
   frontend:
     build: ./frontend
     container_name: ik-tracker-frontend
@@ -32,6 +48,15 @@ services:
     ports:
       # 8082/8083 на сервере заняты другими проектами — берём 8084
       - "8084:80"
+    networks:
+      - default
+      # Общая сеть edge-прокси (/root/infra): через неё rezonans26.ru ходит
+      # на этот контейнер по имени ik-tracker-frontend.
+      - arkadium_shared
 
 volumes:
   backend_data:
+
+networks:
+  arkadium_shared:
+    external: true

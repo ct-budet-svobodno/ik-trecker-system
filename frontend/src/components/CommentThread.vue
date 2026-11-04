@@ -185,16 +185,16 @@ function fmt(iso) {
 }
 
 .comment__badge {
-  font-size: 10px;
+  font-size: 11px;
   background: color-mix(in srgb, var(--status-done) 20%, transparent);
   color: var(--status-done);
-  border-radius: 5px;
+  border-radius: 6px;
   padding: 1px 6px;
 }
 
 .comment__text {
   margin: 3px 0 4px;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
@@ -247,18 +247,18 @@ textarea {
   background: var(--surface);
   color: var(--text);
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 13px;
   resize: vertical;
 }
 
 .btn-mini {
   align-self: flex-start;
   border: none;
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--accent);
   color: #fff;
   padding: 6px 12px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }

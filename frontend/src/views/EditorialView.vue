@@ -189,58 +189,13 @@ function closeModal() {
 </template>
 
 <style scoped>
-.app-layout {
-  display: flex;
-  min-height: 100vh;
-}
-
-.app-main {
-  flex-grow: 1;
-  padding: 28px 32px;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
 .app-main__header {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
   margin-bottom: 20px;
-}
-
-.breadcrumb {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--text-faint);
-  margin: 0 0 6px;
-}
-
-h1 {
-  font-size: 22px;
-  margin: 0;
-  letter-spacing: 0.02em;
-}
-
-.subtitle {
-  margin: 6px 0 0;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.create-btn {
-  border: none;
-  border-radius: 8px;
-  background: var(--success);
-  color: #0c1410;
-  font-weight: 600;
-  padding: 9px 16px;
-  white-space: nowrap;
-}
-
-.create-btn:hover {
-  background: var(--success-hover);
 }
 
 .month-nav {
@@ -350,7 +305,7 @@ h1 {
   color: var(--text);
   border-radius: 6px;
   padding: 4px 6px;
-  font-size: 11.5px;
+  font-size: 12px;
   text-align: left;
   width: 100%;
 }
@@ -454,7 +409,7 @@ h1 {
     border: 1px solid var(--border);
     background: var(--surface);
     color: var(--text);
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 11px 13px;
     text-align: left;
   }

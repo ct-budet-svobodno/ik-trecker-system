@@ -562,35 +562,13 @@ async function layoutAsTree() {
 </template>
 
 <style scoped>
-.app-layout {
-  display: flex;
-  min-height: 100vh;
-}
-
 .app-main {
-  flex-grow: 1;
-  padding: 28px 32px;
-  max-width: 100%;
-  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .app-main__header {
   margin-bottom: 16px;
-}
-
-.breadcrumb {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--text-faint);
-  margin: 0 0 6px;
-}
-
-h1 {
-  font-size: 22px;
-  margin: 0;
-  letter-spacing: 0.02em;
 }
 
 .alert {
@@ -756,7 +734,7 @@ h1 {
   gap: 6px;
   padding: 12px 14px;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface-raised);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
   cursor: grab;

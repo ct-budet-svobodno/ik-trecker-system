@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import AppLoader from '../components/AppLoader.vue'
@@ -7,7 +7,9 @@ import AppSidebar from '../components/AppSidebar.vue'
 import BaseIcon from '../components/BaseIcon.vue'
 import CreateTaskModal from '../components/CreateTaskModal.vue'
 import TaskCard from '../components/TaskCard.vue'
-import { STATUS_FILTERS, STATUS_META } from '../constants/taskMeta'
+import TaskProgress from '../components/TaskProgress.vue'
+import TaskSheet from '../components/TaskSheet.vue'
+import { STATUS_META } from '../constants/taskMeta'
 import { LEADERSHIP_POSITION_LABELS } from '../constants/roleLabels'
 import { fetchLeadershipTasks, updateLeadershipTask } from '../api/leadershipTasks'
 import { fetchMyPosts } from '../api/editorial'
@@ -15,6 +17,7 @@ import { EDITORIAL_STATUS_LABELS } from '../constants/editorialMeta'
 import { useAuthStore } from '../stores/auth'
 import { useTasksStore } from '../stores/tasks'
 import { addDays, dayKey } from '../utils/dateKey'
+import { byUrgency, isAssignedTo, isOverdue, progressStats, todayKey } from '../utils/taskProgress'
 
 const STATUS_COLUMNS = ['todo', 'in_progress', 'in_review', 'done']
 
@@ -99,6 +102,13 @@ const myEditorialItems = computed(() => {
   return items
 })
 
+const shownLeadership = computed(() =>
+  showAllLeadership.value ? fromLeadership.value : fromLeadership.value.slice(0, INBOX_LIMIT),
+)
+const shownPosts = computed(() =>
+  showAllPosts.value ? myEditorialItems.value : myEditorialItems.value.slice(0, INBOX_LIMIT),
+)
+
 async function loadMyPosts() {
   try {
     myPosts.value = await fetchMyPosts()
@@ -107,10 +117,39 @@ async function loadMyPosts() {
   }
 }
 
+// Входящие («От руководства», «Мои посты») показывают первые строки — остальное по кнопке,
+// чтобы блоки не выталкивали доску за первый экран.
+const INBOX_LIMIT = 3
+const showAllLeadership = ref(false)
+const showAllPosts = ref(false)
+
+// null | статус | 'overdue' — задаётся счётчиками в карточке прогресса.
 const statusFilter = ref(null)
 const searchQuery = ref('')
 const showCreateModal = ref(false)
 const viewMode = ref('grid')
+
+// Открытая в шторке задача. Держим id, а саму задачу берём из стора —
+// так шторка видит смену статуса сразу.
+// ?task=<id> — открыть карточку сразу (ссылка из уведомления или напоминания).
+const openedTaskId = ref(route.query.task ? Number(route.query.task) : null)
+watch(
+  () => route.query.task,
+  (id) => {
+    if (id) openedTaskId.value = Number(id)
+  },
+)
+
+function closeTask() {
+  openedTaskId.value = null
+  if (route.query.task) {
+    const { task: _task, ...query } = route.query
+    router.replace({ query })
+  }
+}
+const openedTask = computed(
+  () => tasksStore.tasks.find((task) => task.id === openedTaskId.value) ?? null,
+)
 
 const draggedTaskId = ref(null)
 const dragOverStatus = ref(null)
@@ -129,22 +168,32 @@ const activeDirection = computed(
   () => tasksStore.directions.find((d) => d.id === activeDirectionId.value) ?? null,
 )
 
-// Область просмотра: направление → all (явный список) → mine (дефолт при входе).
+// Область просмотра: направление → all (явный список) → private (выданные мной
+// поручения) → mine (дефолт при входе).
 const scope = computed(() => {
   if (activeDirectionId.value !== null) return 'direction'
   if (route.query.all === '1') return 'all'
+  if (route.query.private === '1') return 'private'
   return 'mine'
 })
 
 // Базовый набор задач для текущей области (до фильтров статуса и поиска).
 const scopedTasks = computed(() => {
   if (scope.value === 'direction') {
-    return tasksStore.tasks.filter((task) => task.direction.id === activeDirectionId.value)
+    return tasksStore.tasks.filter((task) => task.direction?.id === activeDirectionId.value)
   }
   if (scope.value === 'mine') {
-    return tasksStore.tasks.filter((task) => task.assignee?.id === authStore.user?.id)
+    return tasksStore.tasks.filter((task) => isAssignedTo(task, authStore.user?.id))
   }
-  return tasksStore.tasks
+  if (scope.value === 'private') {
+    // Админы и секретарь видят все поручения, остальные — только выданные ими.
+    return tasksStore.tasks.filter(
+      (task) =>
+        task.is_private && (authStore.seesAllPrivate || task.created_by_id === authStore.user?.id),
+    )
+  }
+  // «Все ТЗ» — сводка по направлениям; личные поручения живут вне них.
+  return tasksStore.tasks.filter((task) => !task.is_private)
 })
 
 const heading = computed(() => {
@@ -153,6 +202,15 @@ const heading = computed(() => {
       crumb: activeDirection.value?.name ?? '—',
       title: activeDirection.value?.name ?? '—',
       subtitle: `Задачи направления «${activeDirection.value?.name ?? ''}»`,
+    }
+  }
+  if (scope.value === 'private') {
+    return {
+      crumb: 'Поручения',
+      title: 'Поручения',
+      subtitle: authStore.seesAllPrivate
+        ? 'Личные поручения руководства. Их видят автор, исполнитель, админы и секретарь.'
+        : 'Личные поручения, которые вы выдали. Их видят исполнитель, админы и секретарь.',
     }
   }
   if (scope.value === 'all') {
@@ -169,18 +227,15 @@ const heading = computed(() => {
   }
 })
 
-const stats = computed(() => {
-  const counts = { total: scopedTasks.value.length, in_progress: 0, in_review: 0, done: 0 }
-  for (const task of scopedTasks.value) {
-    if (task.status in counts) counts[task.status] += 1
-  }
-  return counts
-})
+const stats = computed(() => progressStats(scopedTasks.value))
 
 const visibleTasks = computed(() => {
   let result = scopedTasks.value
 
-  if (statusFilter.value !== null) {
+  const today = todayKey()
+  if (statusFilter.value === 'overdue') {
+    result = result.filter((task) => isOverdue(task, today))
+  } else if (statusFilter.value !== null) {
     result = result.filter((task) => task.status === statusFilter.value)
   }
   const query = searchQuery.value.trim().toLowerCase()
@@ -190,7 +245,7 @@ const visibleTasks = computed(() => {
         task.title.toLowerCase().includes(query) || task.description.toLowerCase().includes(query),
     )
   }
-  return result
+  return [...result].sort((a, b) => byUrgency(a, b, today))
 })
 
 function handleTaskCreated(task) {
@@ -204,6 +259,11 @@ const tasksByStatus = computed(() => {
   }
   return groups
 })
+
+// Двигать статус можно своей задачей или той, которой управляешь (права — с бэка).
+function canMove(task) {
+  return task.can_manage || isAssignedTo(task, authStore.user?.id)
+}
 
 function onDragStart(task) {
   draggedTaskId.value = task.id
@@ -252,26 +312,11 @@ async function onDrop(status) {
           <h1>{{ heading.title }}</h1>
           <p class="subtitle">{{ heading.subtitle }}</p>
         </div>
-        <div class="metrics">
-          <div class="metric">
-            <span class="metric__num">{{ stats.total }}</span>
-            <span class="metric__label">Всего</span>
-          </div>
-          <span class="metric__sep" />
-          <div class="metric">
-            <span class="metric__num">{{ stats.in_progress }}</span>
-            <span class="metric__label">В работе</span>
-          </div>
-          <span class="metric__sep" />
-          <div class="metric">
-            <span class="metric__num">{{ stats.in_review }}</span>
-            <span class="metric__label">На проверке</span>
-          </div>
-          <span class="metric__sep" />
-          <div class="metric">
-            <span class="metric__num">{{ stats.done }}</span>
-            <span class="metric__label">Готово</span>
-          </div>
+        <div class="page-head__side">
+          <button v-if="canCreateTask" class="create-btn" @click="showCreateModal = true">
+            <BaseIcon name="plus" :size="16" />
+            Выдать ТЗ
+          </button>
         </div>
       </div>
 
@@ -300,13 +345,14 @@ async function onDrop(status) {
         </button>
       </div>
 
-      <section v-if="scope === 'mine' && fromLeadership.length" class="from-leadership">
+      <div v-if="scope === 'mine' && (fromLeadership.length || myEditorialItems.length)" class="inbox">
+      <section v-if="fromLeadership.length" class="from-leadership">
         <div class="from-leadership__head">
           <span class="from-leadership__title">От руководства</span>
           <span class="from-leadership__count">{{ fromLeadership.length }}</span>
         </div>
         <ul class="from-leadership__list">
-          <li v-for="item in fromLeadership" :key="item.id" class="fl-item">
+          <li v-for="item in shownLeadership" :key="item.id" class="fl-item">
             <span class="fl-item__date">{{ formatLeadershipDate(item.date) }}</span>
             <span
               v-if="item.direction"
@@ -320,21 +366,28 @@ async function onDrop(status) {
             </span>
             <span class="fl-item__title">{{ item.title }}</span>
             <button class="fl-item__done" title="Отметить выполненным" @click="markLeadershipDone(item)">
-              ✓ Выполнено
+              Выполнено
             </button>
           </li>
         </ul>
+        <button
+          v-if="fromLeadership.length > INBOX_LIMIT"
+          class="inbox__more"
+          @click="showAllLeadership = !showAllLeadership"
+        >
+          {{ showAllLeadership ? 'Свернуть' : `Ещё ${fromLeadership.length - INBOX_LIMIT}` }}
+        </button>
       </section>
 
       <!-- Мои посты Редакции: видно каждому, кого назначили райтером/дизайнером. -->
-      <section v-if="scope === 'mine' && myEditorialItems.length" class="from-leadership my-posts">
+      <section v-if="myEditorialItems.length" class="from-leadership my-posts">
         <div class="from-leadership__head">
           <span class="from-leadership__title">Мои посты</span>
           <span class="from-leadership__count">{{ myEditorialItems.length }}</span>
         </div>
         <ul class="from-leadership__list">
           <li
-            v-for="item in myEditorialItems"
+            v-for="item in shownPosts"
             :key="`${item.post.id}-${item.role}`"
             class="fl-item"
           >
@@ -346,11 +399,19 @@ async function onDrop(status) {
               class="fl-item__done"
               @click="router.push({ name: 'editorial-post', params: { id: item.post.id } })"
             >
-              Открыть →
+              Открыть
             </button>
           </li>
         </ul>
+        <button
+          v-if="myEditorialItems.length > INBOX_LIMIT"
+          class="inbox__more"
+          @click="showAllPosts = !showAllPosts"
+        >
+          {{ showAllPosts ? 'Свернуть' : `Ещё ${myEditorialItems.length - INBOX_LIMIT}` }}
+        </button>
       </section>
+      </div>
 
       <AppLoader v-if="tasksStore.isLoading" />
       <div v-else-if="tasksStore.loadError" class="state-message state-message--error">
@@ -358,23 +419,13 @@ async function onDrop(status) {
       </div>
 
       <template v-else>
+        <TaskProgress v-model:filter="statusFilter" :stats="stats" />
+
         <div class="controls-row">
           <label class="search">
             <BaseIcon class="search__icon" name="search" :size="16" />
             <input v-model="searchQuery" class="search__input" type="text" placeholder="Поиск по ТЗ…" />
           </label>
-
-          <div v-if="viewMode === 'grid'" class="filter-tabs">
-            <button
-              v-for="filter in STATUS_FILTERS"
-              :key="filter.label"
-              class="filter-tab"
-              :class="{ 'filter-tab--active': statusFilter === filter.value }"
-              @click="statusFilter = filter.value"
-            >
-              {{ filter.label }}
-            </button>
-          </div>
 
           <div class="view-toggle">
             <button
@@ -394,17 +445,18 @@ async function onDrop(status) {
               <BaseIcon name="columns" :size="16" />
             </button>
           </div>
-
-          <button v-if="canCreateTask" class="create-btn" @click="showCreateModal = true">
-            <BaseIcon name="plus" :size="16" />
-            Выдать ТЗ
-          </button>
         </div>
 
         <template v-if="viewMode === 'grid'">
           <div v-if="visibleTasks.length === 0" class="state-message">Задач не найдено.</div>
           <div v-else class="task-grid">
-            <TaskCard v-for="task in visibleTasks" :key="task.id" :task="task" />
+            <TaskCard
+              v-for="task in visibleTasks"
+              :key="task.id"
+              :task="task"
+              class="task-grid__card"
+              @click="openedTaskId = task.id"
+            />
           </div>
         </template>
 
@@ -431,11 +483,11 @@ async function onDrop(status) {
                   v-for="task in tasksByStatus[status]"
                   :key="task.id"
                   class="kanban-card"
-                  draggable="true"
+                  :draggable="canMove(task)"
                   @dragstart="onDragStart(task)"
                   @dragend="onDragEnd"
                 >
-                  <TaskCard :task="task" :show-status="false" />
+                  <TaskCard :task="task" :show-status="false" @click="openedTaskId = task.id" />
                 </div>
               </div>
             </section>
@@ -445,9 +497,12 @@ async function onDrop(status) {
       </template>
     </main>
 
+    <TaskSheet v-if="openedTask" :task="openedTask" @close="closeTask" />
+
     <CreateTaskModal
       v-if="showCreateModal"
       :directions="tasksStore.directions"
+      :private-by-default="scope === 'private'"
       @close="showCreateModal = false"
       @created="handleTaskCreated"
     />
@@ -455,19 +510,34 @@ async function onDrop(status) {
 </template>
 
 <style scoped>
-.app-layout {
-  display: flex;
-  min-height: 100vh;
+/* Панель «От руководства» — записи таймлайна руководства по моим направлениям. */
+.inbox {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 24px;
 }
 
-/* Панель «От руководства» — записи таймлайна руководства по моим направлениям. */
 .from-leadership {
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
   border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
+  padding: 12px 16px;
+}
+
+.inbox__more {
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.inbox__more:hover {
+  color: var(--text);
 }
 
 .from-leadership__head {
@@ -484,6 +554,7 @@ async function onDrop(status) {
 }
 
 .from-leadership__count {
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-muted);
   background: var(--surface-raised);
@@ -503,12 +574,18 @@ async function onDrop(status) {
 .fl-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.fl-item + .fl-item {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
 }
 
 .fl-item__date {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-muted);
   min-width: 56px;
 }
@@ -517,7 +594,7 @@ async function onDrop(status) {
   font-size: 11px;
   font-weight: 600;
   color: #fff;
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 2px 6px;
   white-space: nowrap;
 }
@@ -531,29 +608,28 @@ async function onDrop(status) {
 .fl-chip--position { background: var(--accent); }
 .fl-chip--editorial { background: var(--dir-smi); }
 
-/* «Мои посты» — та же плашка, но с бирюзовой рамкой Редакции. */
-.my-posts {
-  border-left-color: var(--dir-prod-b);
-}
-
 .my-posts__status {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;
 }
 
 .fl-item__title {
   flex-grow: 1;
-  font-size: 13.5px;
+  font-size: 13px;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fl-item__done {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--status-done);
-  border-radius: 7px;
-  padding: 4px 10px;
+  border-radius: 8px;
+  height: 28px;
+  padding: 0 10px;
   font-size: 12px;
   white-space: nowrap;
   flex-shrink: 0;
@@ -563,77 +639,24 @@ async function onDrop(status) {
   background: color-mix(in srgb, var(--status-done) 14%, transparent);
 }
 
-.app-main {
-  flex-grow: 1;
-  padding: 28px 32px;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
 .page-head {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
   flex-wrap: wrap;
-  margin-bottom: 26px;
+  margin-bottom: 24px;
 }
 
-/* Единственный капс-уровень на странице (mono, разрежённый). */
-.breadcrumb {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  margin: 0 0 8px;
+.page-head__titles {
+  min-width: 0;
 }
 
-h1 {
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  margin: 0 0 6px;
-}
-
-.subtitle {
-  color: var(--text-muted);
-  font-size: 14px;
-  margin: 0;
-}
-
-/* Метрики чистой строкой: моно-числа + подпись, разделители-волоски, без точек. */
-.metrics {
+.page-head__side {
   display: flex;
-  align-items: stretch;
-  gap: 18px;
-  padding: 4px 0;
-}
-
-.metric {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.metric__num {
-  font-family: var(--font-mono);
-  font-size: 20px;
-  font-weight: 500;
-  line-height: 1;
-  color: var(--text);
-}
-
-.metric__label {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.metric__sep {
-  width: 1px;
-  align-self: stretch;
-  background: var(--border);
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .controls-row {
@@ -646,10 +669,12 @@ h1 {
 
 .search {
   flex: 1 1 220px;
+  max-width: 320px;
   min-width: 180px;
   display: flex;
   align-items: center;
   gap: 8px;
+  height: var(--control-h);
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -670,7 +695,8 @@ h1 {
   border: none;
   outline: none;
   background: transparent;
-  padding: 9px 0;
+  min-width: 0;
+  padding: 0;
   font-size: 14px;
 }
 
@@ -678,37 +704,12 @@ h1 {
   color: var(--text-faint);
 }
 
-.filter-tabs {
-  display: flex;
-  gap: 4px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 3px;
-}
-
-.filter-tab {
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-
-.filter-tab:hover {
-  color: var(--text);
-}
-
-.filter-tab--active {
-  background: var(--accent-soft);
-  color: var(--text);
-}
-
 .view-toggle {
   display: flex;
   gap: 2px;
+  height: var(--control-h);
+  /* Переключатель вида уходит вправо: слева поиск и фильтры, справа — вид. */
+  margin-left: auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -723,7 +724,7 @@ h1 {
   background: transparent;
   color: var(--text-muted);
   width: 32px;
-  height: 30px;
+  height: 100%;
   border-radius: 6px;
   transition: color 0.15s ease, background 0.15s ease;
 }
@@ -737,33 +738,14 @@ h1 {
   color: var(--text);
 }
 
-.create-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  border-radius: 8px;
-  background: var(--success);
-  color: #0c1410;
-  font-weight: 600;
-  font-size: 14px;
-  padding: 9px 16px;
-  white-space: nowrap;
-  transition: background 0.15s ease, transform 0.1s ease;
-}
-
-.create-btn:hover {
-  background: var(--success-hover);
-}
-
-.create-btn:active {
-  transform: scale(0.98);
-}
-
 .task-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
+}
+
+.task-grid__card {
+  cursor: pointer;
 }
 
 .state-message {
@@ -823,6 +805,15 @@ h1 {
   flex-grow: 1;
 }
 
+/* Карточки в колонке лежат на более тёмном фоне, чтобы отделяться от самой колонки. */
+.kanban-card :deep(.task-card) {
+  background: var(--bg);
+}
+
+.kanban-card :deep(.task-card:hover) {
+  background: var(--surface-hover);
+}
+
 .kanban-column__count {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -865,7 +856,7 @@ h1 {
     gap: 4px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 3px;
     margin-bottom: 16px;
   }
@@ -877,8 +868,12 @@ h1 {
     color: var(--text-muted);
     padding: 8px 10px;
     border-radius: 8px;
-    font-size: 13.5px;
+    font-size: 13px;
     transition: color 0.15s ease, background 0.15s ease;
+  }
+
+  .scope-switch__btn {
+    min-height: 38px;
   }
 
   .scope-switch__btn--active {
@@ -891,14 +886,58 @@ h1 {
     flex: 0 0 auto;
   }
 
-  .metrics {
-    gap: 14px;
-    width: 100%;
-    justify-content: space-between;
+  /* Заголовок и «Выдать ТЗ» — одной строкой: прогресс должен быть виден сразу. */
+  .page-head {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--space-3);
   }
 
-  h1 {
-    font-size: 22px;
+  .page-head__side {
+    flex-shrink: 0;
+  }
+
+  .inbox {
+    grid-template-columns: 1fr;
+    margin-bottom: 16px;
+  }
+
+  .search {
+    max-width: none;
+    height: var(--control-h-touch);
+  }
+
+  /* Канбан на телефоне не нужен: перетаскивание не работает пальцем,
+     статус меняется в шторке задачи. */
+  .view-toggle,
+  .kanban-board {
+    display: none;
+  }
+
+  /* В мини-аппе каждый пиксель на счету — подзаголовок только на десктопе. */
+  .page-head .subtitle {
+    display: none;
+  }
+
+  .controls-row {
+    margin-bottom: var(--space-3);
+  }
+
+  .task-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+
+  .task-grid :deep(.task-card) {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .task-grid :deep(.task-card__desc) {
+    -webkit-line-clamp: 1;
+  }
+
+  .task-grid :deep(.task-card:hover) {
+    transform: none;
   }
 
   .page-head {
@@ -911,8 +950,8 @@ h1 {
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     gap: 12px;
-    margin: 0 -14px;
-    padding: 0 14px 10px;
+    margin: 0 -16px;
+    padding: 0 16px 10px;
     -webkit-overflow-scrolling: touch;
   }
 

@@ -17,3 +17,6 @@ frontend/dist/
 # Editor
 .vscode/
 .idea/
+
+# Бэкапы боевых баз (персданные) — только локально
+backups/

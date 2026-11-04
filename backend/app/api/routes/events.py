@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.models.event import Event
 from app.models.user import User, UserRole
 from app.repositories import event_repository
-from app.schemas.event import EventCreate, EventOut, EventUpdate
+from app.schemas.event import EventCreate, EventOut, EventRsvpIn, EventUpdate
 from app.services import event_service
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
@@ -20,8 +20,8 @@ def _get_event_or_404(db: Session, event_id: int) -> Event:
 
 
 @router.get("", response_model=list[EventOut])
-def list_events(db: Session = Depends(get_db)) -> list[Event]:
-    return event_service.list_events(db)
+def list_events(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[dict]:
+    return event_service.with_rsvps(db, event_service.list_events(db), current_user)
 
 
 @router.post(
@@ -34,8 +34,9 @@ def create_event(
     event_create: EventCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> Event:
-    return event_service.create_event(db, event_create, created_by=current_user)
+) -> dict:
+    event = event_service.create_event(db, event_create, created_by=current_user)
+    return event_service.with_rsvps(db, [event], current_user)[0]
 
 
 @router.patch(
@@ -43,9 +44,27 @@ def create_event(
     response_model=EventOut,
     dependencies=[Depends(require_role(UserRole.ADMIN, UserRole.MANAGER))],
 )
-def update_event(event_id: int, event_update: EventUpdate, db: Session = Depends(get_db)) -> Event:
+def update_event(
+    event_id: int,
+    event_update: EventUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    event = event_service.update_event(db, _get_event_or_404(db, event_id), event_update)
+    return event_service.with_rsvps(db, [event], current_user)[0]
+
+
+@router.put("/{event_id}/rsvp", response_model=EventOut)
+def set_rsvp(
+    event_id: int,
+    payload: EventRsvpIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """«Приду / Не приду» — отвечает любой; null снимает ответ."""
     event = _get_event_or_404(db, event_id)
-    return event_service.update_event(db, event, event_update)
+    event_service.set_rsvp(db, event, current_user, payload.status)
+    return event_service.with_rsvps(db, [event], current_user)[0]
 
 
 @router.delete(

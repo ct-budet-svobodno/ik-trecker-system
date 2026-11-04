@@ -96,6 +96,7 @@ def main() -> None:
                     title=title,
                     direction_id=direction.id,
                     position=None,
+                    is_editorial=False,
                     date=monday + timedelta(days=day_offset),
                     status=LeadershipTaskStatus.TODO,
                     created_by_id=admin.id,
