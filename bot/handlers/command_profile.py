@@ -447,6 +447,10 @@ async def start_cmd(message: Message, state: FSMContext):
     await state.clear()
 
     payload = (message.text or "").partition(" ")[2].strip()
+    if payload == "mafia":
+        from handlers.command_mafia import RULES
+        await _screen(bot, chat_id, user.id, RULES, None)
+        return
     # Пришли из трекера («Подключить Telegram») — анкета тут ни при чём:
     # в трекере есть и те, кого нет в базе актива.
     if payload in START_PAYLOADS:

@@ -68,6 +68,8 @@ GAMES_TEXT = "\n".join([
     DIVIDER,
     "Дурак и морской бой — с ботом или один на один, бункер — всем активом.",
     "Позвать соперника можно прямо из игры: приглашение придёт во флуд.",
+    "",
+    "🎭 Мафия — прямо в чате, на 5–16 человек. Напиши !мафия в группе; роли и ночные действия придут в личку.",
 ])
 
 
@@ -139,7 +141,8 @@ async def durak_play_kb_group(bot: Bot) -> InlineKeyboardMarkup:
 
 def games_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎮 Открыть игры", web_app=WebAppInfo(url=games_url()))]
+        [InlineKeyboardButton(text="🎮 Открыть игры", web_app=WebAppInfo(url=games_url()))],
+        [InlineKeyboardButton(text="🎭 Мафия в чате · правила", callback_data="mafia_rules")]
     ])
 
 

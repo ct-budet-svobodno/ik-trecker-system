@@ -20,3 +20,4 @@ frontend/dist/
 
 # Бэкапы боевых баз (персданные) — только локально
 backups/
+bot/database/mafia_sessions.db*
