@@ -1,11 +1,12 @@
 import io
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from PIL import Image
 from aiogram import Bot
+from utils.helpers import MSK
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ def _snapshot(user_id: int, img: Image.Image, now: float) -> None:
     try:
         user_dir = _SNAP_DIR / str(int(user_id))
         user_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.fromtimestamp(now).strftime("%Y%m%d_%H%M%S_%f")
+        stamp = datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d_%H%M%S_%fZ")
         (user_dir / f"{stamp}.jpg").write_bytes(_jpeg_bytes(img))
     except Exception:
         logger.debug("Не сохранил снапшот %s", user_id, exc_info=True)
@@ -161,26 +162,42 @@ async def snapshot_avatar(bot: Bot, user_id: int) -> Image.Image | None:
 async def avatar_at(bot: Bot, user_id: int, at) -> Image.Image | None:
     """Аватарка, актуальная на момент at (datetime|None).
 
-    Самый свежий снапшот не новее даты; нет снапшотов или даты —
-    обычное поведение (кэш latest, потом живое скачивание).
+    Только снимок не новее даты. Без даты/подходящего снимка не подставляем
+    сегодняшнее Telegram-фото. Фото анкеты — лишь если Telegram-истории нет.
     """
     if at is not None:
         try:
             user_dir = _SNAP_DIR / str(int(user_id))
-            stamp = at.timestamp() if hasattr(at, "timestamp") else float(at)
-            best: Path | None = None
+            if isinstance(at, datetime):
+                # created_at записан через msk_now(): наивное московское время.
+                stamp = (at if at.tzinfo else at.replace(tzinfo=MSK)).timestamp()
+            else:
+                stamp = float(at)
+            candidates = []
             if user_dir.is_dir():
-                for path in sorted(user_dir.glob("*.jpg")):
-                    if path.stat().st_mtime <= stamp and (
-                            best is None or path.stat().st_mtime > best.stat().st_mtime):
-                        best = path
-            if best is not None:
-                img = Image.open(best)
-                img.load()
-                return img.convert("RGBA")
+                for path in user_dir.glob("*.jpg"):
+                    try:
+                        # Старые файлы созданы сервером в UTC без суффикса Z.
+                        taken = datetime.strptime(path.stem.rstrip("Z"), "%Y%m%d_%H%M%S_%f")
+                        taken_stamp = taken.replace(tzinfo=timezone.utc).timestamp()
+                        if taken_stamp <= stamp:
+                            candidates.append((taken_stamp, path))
+                    except ValueError:
+                        continue
+            for _, path in sorted(candidates, reverse=True):
+                try:
+                    with Image.open(path) as img:
+                        return img.convert("RGBA")
+                except (OSError, ValueError):
+                    continue
         except Exception:
             logger.debug("Не нашёл снапшот %s", user_id, exc_info=True)
-    return await load_user_profile_avatar(bot, user_id)
+    # Нельзя приписать нынешнюю аватарку старой цитате. Историю не портим
+    # живым скачиванием; уже существующие latest/history блокируют подмену.
+    user_dir = _SNAP_DIR / str(int(user_id))
+    if _latest_path(user_id).is_file() or (user_dir.is_dir() and any(user_dir.glob("*.jpg"))):
+        return None
+    return await _profile_avatar(bot, user_id)
 
 
 async def load_user_profile_avatar(bot: Bot, user_id: int) -> Image.Image | None:

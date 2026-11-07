@@ -11,7 +11,7 @@ from aiogram import Bot
 
 from database.engine import async_session_maker
 from utils.create_quote import render_quote_pages
-from utils.names import fio_name
+from utils.names import quote_name
 from utils.telegram_avatar import avatar_at
 
 # Отступ между двумя цитатами на картинке батла.
@@ -26,11 +26,7 @@ async def quote_author(quote) -> str:
     except (TypeError, ValueError):
         uid = None
     async with async_session_maker() as session:
-        name = await fio_name(session, uid, quote.tg_username)
-    if name:
-        return name
-    tag = (quote.tg_username or "").lstrip("@")
-    return tag or "чат"
+        return await quote_name(session, uid, quote.tg_username)
 
 
 async def quote_avatar(bot: Bot, quote) -> Image.Image | None:

@@ -73,7 +73,7 @@ class ActivistsDAO(BaseDAO):
             return None
         res = await self.session.execute(
             select(self.model).where(
-                func.lower(func.replace(self.model.tg_username, "@", "")) == normalized
+                func.lower(func.trim(func.replace(self.model.tg_username, "@", ""))) == normalized
             ).limit(1)
         )
         return res.scalars().first()
@@ -87,6 +87,3 @@ class QuotesDAO(BaseDAO):
             select(self.model).order_by(func.random()).limit(1)
         )
         return result.scalar_one_or_none()
-
-
-    

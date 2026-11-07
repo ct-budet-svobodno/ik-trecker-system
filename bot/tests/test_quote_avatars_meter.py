@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 from PIL import Image
@@ -56,6 +57,46 @@ class AvatarTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(profile.await_count, 2)
         self.assertFalse(avatars._latest_path(42).exists())
         self.assertFalse(avatars._SNAP_DIR.exists())
+
+    async def test_history_uses_date_in_filename_not_file_mtime_or_latest(self):
+        old = datetime(2026, 10, 1, 10, tzinfo=timezone.utc).timestamp()
+        new = datetime(2026, 10, 2, 10, tzinfo=timezone.utc).timestamp()
+        avatars._snapshot(42, Image.new("RGB", (20, 20), "red"), old)
+        avatars._snapshot(42, Image.new("RGB", (20, 20), "blue"), new)
+        avatars._store(42, Image.new("RGB", (20, 20), "blue"))
+        # Копирование/восстановление файлов меняет mtime, но не дату снимка.
+        for path in (avatars._SNAP_DIR / "42").glob("*.jpg"):
+            os.utime(path, (new + 10000, new + 10000))
+        with patch.object(avatars, "_download", AsyncMock()) as download:
+            img = await avatars.avatar_at(None, 42, datetime(2026, 10, 1, 14))
+            self.assertGreater(img.getpixel((0, 0))[0], 200)
+            self.assertLess(img.getpixel((0, 0))[2], 30)
+            download.assert_not_awaited()
+
+    async def test_moscow_naive_time_does_not_select_future_snapshot(self):
+        # 15:00 MSK = 12:00 UTC; снимок 13:00 UTC ещё из будущего.
+        for hour, color in ((11, "red"), (13, "blue")):
+            stamp = datetime(2026, 10, 1, hour, tzinfo=timezone.utc).timestamp()
+            avatars._snapshot(42, Image.new("RGB", (20, 20), color), stamp)
+        img = await avatars.avatar_at(None, 42, datetime(2026, 10, 1, 15))
+        self.assertGreater(img.getpixel((0, 0))[0], 200)
+
+    async def test_unknown_date_or_missing_period_never_uses_current_avatar(self):
+        avatars._store(42, Image.new("RGB", (20, 20), "blue"))
+        avatars._snapshot(42, Image.new("RGB", (20, 20), "blue"), 2000)
+        with patch.object(avatars, "_download", AsyncMock()) as download, patch.object(
+            avatars, "_profile_avatar", AsyncMock()
+        ) as profile:
+            self.assertIsNone(await avatars.avatar_at(None, 42, None))
+            self.assertIsNone(await avatars.avatar_at(None, 42, 1000))
+            download.assert_not_awaited()
+            profile.assert_not_awaited()
+
+    async def test_legacy_snapshot_filename(self):
+        folder = avatars._SNAP_DIR / "42"
+        folder.mkdir(parents=True)
+        Image.new("RGB", (20, 20), "red").save(folder / "20261001_110000_000000.jpg")
+        self.assertIsNotNone(await avatars.avatar_at(None, 42, datetime(2026, 10, 1, 15)))
 
     async def test_synced_profile_photos_try_second_if_first_unavailable(self):
         engine = create_async_engine("sqlite+aiosqlite:///:memory:")
