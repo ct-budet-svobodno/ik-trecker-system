@@ -78,11 +78,63 @@ async def _download(bot: Bot, user_id: int) -> Image.Image | None:
         return None
     pic = sizes[-1]
     buf = io.BytesIO()
-    await bot.download(pic, destination=buf)
-    buf.seek(0)
-    img = Image.open(buf)
-    img.load()
-    return img.convert("RGBA")
+    try:
+        await bot.download(pic, destination=buf)
+        buf.seek(0)
+        with Image.open(buf) as img:
+            return img.convert("RGBA")
+    except Exception:
+        logger.debug("Не загрузил аватарку %s", user_id, exc_info=True)
+        return None
+
+
+def _last_known(user_id: int) -> Image.Image | None:
+    """Последнее доступное Telegram-фото, даже если кэш старше TTL."""
+    paths = [_latest_path(user_id)]
+    user_dir = _SNAP_DIR / str(int(user_id))
+    if user_dir.is_dir():
+        paths.extend(sorted(user_dir.glob("*.jpg"), reverse=True))
+    for path in paths:
+        try:
+            with Image.open(path) as img:
+                return img.convert("RGBA")
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+async def _profile_avatar(bot: Bot, user_id: int) -> Image.Image | None:
+    """Фото анкеты (в том числе синхронизированной из трекера).
+
+    Не пишем его в кэш Telegram: при появлении аватарки она приоритетнее.
+    """
+    from database.engine import async_session_maker
+    from database.profile_dao import ProfileDAO
+
+    try:
+        async with async_session_maker() as session:
+            dao = ProfileDAO(session)
+            person = await dao.by_tg_id(user_id)
+            photos = await dao.photos(person.id) if person else {}
+        for slot in sorted(photos):
+            try:
+                buf = io.BytesIO()
+                await bot.download(photos[slot], destination=buf)
+                buf.seek(0)
+                with Image.open(buf) as img:
+                    return img.convert("RGBA")
+            except Exception:
+                logger.debug("Не загрузил фото анкеты %s/%s", user_id, slot, exc_info=True)
+    except Exception:
+        logger.debug("Не нашёл фото анкеты %s", user_id, exc_info=True)
+    return None
+
+
+async def _fallback_avatar(bot: Bot, user_id: int) -> Image.Image | None:
+    known = _last_known(user_id)
+    if known is not None:
+        return known
+    return await _profile_avatar(bot, user_id)
 
 
 async def snapshot_avatar(bot: Bot, user_id: int) -> Image.Image | None:
@@ -94,7 +146,7 @@ async def snapshot_avatar(bot: Bot, user_id: int) -> Image.Image | None:
     now = time.time()
     img = await _download(bot, user_id)
     if img is None:
-        return _cached(user_id)
+        return await _fallback_avatar(bot, user_id)
     latest = _latest_path(user_id)
     try:
         same = latest.is_file() and latest.read_bytes() == _jpeg_bytes(img)
@@ -138,6 +190,6 @@ async def load_user_profile_avatar(bot: Bot, user_id: int) -> Image.Image | None
         return hit
     img = await _download(bot, user_id)
     if img is None:
-        return None
+        return await _fallback_avatar(bot, user_id)
     _store(user_id, img)
     return img
