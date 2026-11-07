@@ -83,7 +83,10 @@ class QuotesDAO(BaseDAO):
     model = Quotes
 
     async def get_random_quote(self):
+        from database.quote_media import QuoteJob
         result = await self.session.execute(
-            select(self.model).order_by(func.random()).limit(1)
+            select(self.model).where(~select(QuoteJob.id).where(
+                QuoteJob.quote_id == self.model.id, QuoteJob.state != "done"
+            ).exists()).order_by(func.random()).limit(1)
         )
         return result.scalar_one_or_none()

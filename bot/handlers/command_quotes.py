@@ -18,6 +18,9 @@ from utils.quote_render import quote_author, quote_avatar
 from utils.helpers import msk_now
 from utils.telegram_avatar import snapshot_avatar
 from utils import voice_transcribe
+from database.quote_media import message_part
+from handlers.command_quote_chain import queue_message
+from utils.quote_worker import show_content
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +209,9 @@ async def save_quote(message: Message):
         return
 
     replied = message.reply_to_message
+    if replied.photo or replied.video or replied.animation or replied.video_note:
+        await queue_message(message, [message_part(replied)])
+        return
     text_body = _quoted_text(replied)
     caption_html: str | None = None
 
@@ -259,7 +265,7 @@ async def save_quote(message: Message):
     await _build_and_send(message, tg_id, tg_username, text_body, caption_html)
 
 
-@quotes_router.message(F.voice | F.video_note)
+@quotes_router.message(F.voice)
 async def save_voice_quote(message: Message):
     """Голосовое или кружок с подписью «!цитата»: распознать и в цитату.
     Чужие голосовые без подписи молча пропускаем."""
@@ -319,6 +325,9 @@ async def random_wisdom(message: Message):
 
     if not q:
         await message.reply("Пока нет ни одной цитаты. Сначала кто-нибудь использует !цитата 🙂")
+        return
+
+    if await show_content(message.bot, message.chat.id, q.id, message.message_thread_id):
         return
 
     image_author, avatar = await asyncio.gather(

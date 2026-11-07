@@ -1,0 +1,7 @@
+# Дополнение к /root/flood/docker-compose.yml: прежние env и volume,
+# но код/образ строится из bot/ этого репозитория.
+services:
+  bot:
+    image: ik-flood-tracker:local
+    build:
+      context: ${IK_TRACKER_BOT_SOURCE:?Задайте абсолютный путь к bot/ этого репозитория}

@@ -1,15 +1,18 @@
 .env
-.venv
-venv
-__pycache__/
+.env.*
+!.env.example
+.venv/
+venv/
 **/__pycache__/
-*.pyc
-# Живая база и данные актива монтируются томами, в образ не кладём.
-database/*.db
+**/*.pyc
+**/.DS_Store
+database/*.db*
 database/*.bak*
+database/*.safe
 database/avatars/
 whisper-cache/
+scratch/
+.git/
+.claude/
 *.xlsx
 *.xlsm
-scratch/
-.claude/
