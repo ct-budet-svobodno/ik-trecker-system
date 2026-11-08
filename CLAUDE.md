@@ -22,6 +22,8 @@ docker compose -f docker-compose.dev.yml --profile bot up -d              # + б
 
 Бот (бывший flood, aiogram 3 + SQLite) — в `bot/`, на сервере пока живёт отдельно в `/root/flood` (контейнер `flood-bot-1`). Боевой токен локально не использовать: второй polling выбьет прод-бота. `bot/database/bot.db.bak_*_server` — бэкап боевой базы, в git не идёт (там персданные актива, как и в `*.xlsx`).
 
+Текстовая «Мафия» (`!мафия`, `/mafia`) — `bot/handlers/command_mafia.py`, правила в `bot/utils/mafia.py`, сохранение в отдельной `database/mafia_sessions.db` через `bot/database/mafia_store.py`. Роутер сам подключает таймер startup/shutdown. Правила и запуск тестов — `bot/docs/mafia.md`; тесты `bot/tests/test_mafia.py` не обращаются к Telegram.
+
 На Windows — **`start.bat`** в корне. Проще всего — **`start.bat`** в корне (поднимает бэк и фронт в двух окнах + открывает браузер). Прод на сервере — `docker compose up -d --build`, адрес **https://rezonans26.ru** (общий edge-прокси `/root/infra/nginx.conf` → контейнер `ik-tracker-frontend` в сети `arkadium_shared`; запасной вход — `:8084`). nginx фронта проксирует `/api` на `ik-tracker-backend` — по имени контейнера, не `backend`: в общей сети есть чужой `backend`. Бэк наружу — только `127.0.0.1:8100` для отладки; детали в README. Вручную:
 
 ```
