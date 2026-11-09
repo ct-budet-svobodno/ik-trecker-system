@@ -15,16 +15,18 @@ const props = defineProps({
   directions: { type: Array, default: () => [] },
   // Открыто из раздела «Поручения» — сразу в режиме личного поручения.
   privateByDefault: { type: Boolean, default: false },
+  checklistByDefault: { type: Boolean, default: false },
   task: { type: Object, default: null },
 })
 
 const authStore = useAuthStore()
 const tasksStore = useTasksStore()
 const isEdit = computed(() => props.task !== null)
+const isChecklist = computed(() => props.task?.is_checklist ?? props.checklistByDefault)
 // Личные поручения выдаёт руководство: админ или держатель должности.
 const canAssignPrivate = computed(() => authStore.isLeadership && !isEdit.value)
 const isPrivate = ref(
-  props.task ? props.task.is_private : props.privateByDefault && authStore.isLeadership,
+  props.task ? props.task.is_private : !props.checklistByDefault && props.privateByDefault && authStore.isLeadership,
 )
 
 const emit = defineEmits(['close', 'created', 'saved'])
@@ -89,19 +91,21 @@ const isSubmitting = ref(false)
 // Исполнитель ТЗ: активные по алфавиту (при правке — и нынешний, даже если неактивен).
 const assigneeOptions = computed(() =>
   users.value
-    .filter((u) => u.is_active || u.id === props.task?.assignee?.id)
+    .filter((u) => (u.is_active || u.id === props.task?.assignee?.id) && (!isChecklist.value || u.id !== authStore.user?.id))
     .sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru')),
 )
 
-const noDirections = computed(() => !isPrivate.value && !availableDirections.value.length)
+const noDirections = computed(() => !isPrivate.value && !isChecklist.value && !availableDirections.value.length)
 
 const heading = computed(() => {
+  if (isChecklist.value) return isEdit.value ? 'Изменить чек-лист' : 'Выдать чек-лист'
   if (isEdit.value) return isPrivate.value ? 'Изменить поручение' : 'Изменить ТЗ'
   return isPrivate.value ? 'Личное поручение' : 'Выдать ТЗ'
 })
 
 const submitLabel = computed(() => {
   if (isEdit.value) return 'Сохранить'
+  if (isChecklist.value) return 'Выдать чек-лист'
   if (!isPrivate.value) return 'Выдать ТЗ'
   const n = assigneeIds.value.length
   return n > 1 ? `Дать поручение (${n})` : 'Дать поручение'
@@ -126,7 +130,7 @@ async function saveEdit() {
     payload.assignee_ids = assigneeIds.value
   } else {
     payload.assignee_id = assigneeId.value === '' ? null : Number(assigneeId.value)
-    if (directionId.value !== props.task.direction?.id) payload.direction_id = directionId.value
+    if (!isChecklist.value && directionId.value !== props.task.direction?.id) payload.direction_id = directionId.value
   }
   try {
     emit('saved', await tasksStore.updateFields(props.task.id, payload))
@@ -140,6 +144,10 @@ async function saveEdit() {
 
 async function handleSubmit() {
   error.value = ''
+  if (isChecklist.value && (!assigneeId.value || !dueDate.value)) {
+    error.value = 'Выберите исполнителя и дедлайн'
+    return
+  }
   if (isPrivate.value && !assigneeIds.value.length) {
     error.value = 'Выберите, кому даёте поручение'
     return
@@ -154,7 +162,8 @@ async function handleSubmit() {
       title: title.value,
       description: description.value,
       is_private: isPrivate.value,
-      direction_id: isPrivate.value ? null : directionId.value,
+      is_checklist: isChecklist.value,
+      direction_id: isPrivate.value || isChecklist.value ? null : directionId.value,
       priority: priority.value,
       ...(isPrivate.value
         ? { assignee_ids: assigneeIds.value }
@@ -176,7 +185,7 @@ async function handleSubmit() {
     <form v-swipe-close="() => $emit('close')" class="modal" @submit.prevent="handleSubmit">
       <h2>{{ heading }}</h2>
 
-      <label v-if="canAssignPrivate" class="private-toggle">
+      <label v-if="canAssignPrivate && !isChecklist" class="private-toggle">
         <input v-model="isPrivate" type="checkbox" />
         <span>
           <span class="private-toggle__title">Личное поручение</span>
@@ -191,7 +200,7 @@ async function handleSubmit() {
       <textarea id="task-description" v-model="description" rows="3" maxlength="4000" />
 
       <div class="modal__row">
-        <div v-if="!isPrivate" class="modal__field">
+        <div v-if="!isPrivate && !isChecklist" class="modal__field">
           <label for="task-direction">Направление</label>
           <select id="task-direction" v-model.number="directionId" required>
             <option v-for="direction in availableDirections" :key="direction.id" :value="direction.id">
@@ -252,8 +261,8 @@ async function handleSubmit() {
       <div class="modal__row">
         <div v-if="!isPrivate" class="modal__field">
           <label for="task-assignee">Исполнитель</label>
-          <select id="task-assignee" v-model="assigneeId">
-            <option value="">Не назначен</option>
+          <select id="task-assignee" v-model="assigneeId" :required="isChecklist">
+            <option value="">{{ isChecklist ? 'Выберите исполнителя' : 'Не назначен' }}</option>
             <option v-for="user in assigneeOptions" :key="user.id" :value="user.id">
               {{ user.full_name }}
             </option>
@@ -262,7 +271,7 @@ async function handleSubmit() {
 
         <div class="modal__field">
           <label for="task-due-date">Срок</label>
-          <input id="task-due-date" v-model="dueDate" type="date" />
+          <input id="task-due-date" v-model="dueDate" type="date" :required="isChecklist" />
         </div>
       </div>
 

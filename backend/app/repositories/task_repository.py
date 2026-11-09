@@ -28,14 +28,21 @@ def _visible_to(viewer: User, sees_all_private: bool):
         visible = true()
     else:
         visible = (
-            Task.is_private.is_(False)
+            (Task.is_private.is_(False) & Task.is_checklist.is_(False))
             | (Task.assignee_id == viewer.id)
             | (Task.created_by_id == viewer.id)
             | Task.assignees.any(TaskAssignee.user_id == viewer.id)
         )
+    if viewer.role != UserRole.ADMIN:
+        visible = visible & (
+            Task.is_checklist.is_(False)
+            | (Task.created_by_id == viewer.id)
+            | (Task.assignee_id == viewer.id)
+        )
     if viewer.role == UserRole.EMPLOYEE:
         visible = visible & (
-            Task.assignee_id.is_(None)
+            Task.is_checklist.is_(True)
+            | Task.assignee_id.is_(None)
             | (Task.assignee_id == viewer.id)
             | Task.assignee.has(User.role != UserRole.MANAGER)
         )
@@ -74,6 +81,7 @@ def create(
     due_date: date | None,
     created_by_id: int,
     is_private: bool = False,
+    is_checklist: bool = False,
 ) -> Task:
     task = Task(
         title=title,
@@ -84,6 +92,7 @@ def create(
         due_date=due_date,
         created_by_id=created_by_id,
         is_private=is_private,
+        is_checklist=is_checklist,
     )
     db.add(task)
     db.commit()

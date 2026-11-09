@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_role
+from app.api.deps import get_current_user, require_role
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.repositories import user_repository
@@ -36,9 +36,10 @@ def create_user(user_create: UserCreate, db: Session = Depends(get_db)) -> User:
 @router.get(
     "",
     response_model=list[UserOut],
-    dependencies=[Depends(require_role(UserRole.ADMIN, UserRole.MANAGER))],
 )
-def list_users(db: Session = Depends(get_db)) -> list[User]:
+def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[User]:
+    if current_user.role == UserRole.EMPLOYEE and not (current_user.is_activist and current_user.can_issue_checklists):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
     # Заявки из мини-аппа (ещё не одобренные) сюда не попадают — они в /registrations.
     return [
         _with_reviewer_flag(db, user)
@@ -165,5 +166,6 @@ def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get
         is_editorial=user_update.is_editorial,
         is_zavod=user_update.is_zavod,
         is_activist=user_update.is_activist,
+        can_issue_checklists=user_update.can_issue_checklists,
     )
     return _with_reviewer_flag(db, user)

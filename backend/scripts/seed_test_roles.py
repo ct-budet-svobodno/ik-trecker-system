@@ -75,7 +75,17 @@ def main() -> None:
                     direction_service.set_heads(db, direction, ids + [user.id])
             if editorial and not user.is_editorial:
                 user_repository.update(db, user, is_editorial=True)
+            if username in ("t.activist", "t.editorial"):
+                user_repository.update(
+                    db, user,
+                    is_activist=True,
+                    can_issue_checklists=username == "t.activist",
+                )
             print(f"{'создан' if is_new else 'есть   '} {username}")
+
+        admin, is_new = _ensure_user(db, "t.admin", "Администратор Тестовый")
+        user_repository.update(db, admin, role=UserRole.ADMIN)
+        print(f"{'создан' if is_new else 'есть   '} t.admin")
 
         today = date.today()
         chairman, activist, head = users["t.chairman"], users["t.activist"], users["t.head"]

@@ -20,7 +20,7 @@ docker compose -f docker-compose.dev.yml --profile bot up -d              # + б
 
 **Тестовые роли:** `scripts.seed_test_roles` (после демо-сидов) создаёт `t.chairman`, `t.secretary`, `t.head` (рук. НВК), `t.activist`, `t.editorial` с паролем `test12345` и данными под них. В dev-сборке справа внизу плашка `dev` — `DevRoleSwitcher` (вход под ролью в один клик); в прод-бандл не попадает (`import.meta.env.DEV` в `App.vue`). Списки аккаунтов в сиде и в компоненте держать в согласии.
 
-Бот (бывший flood, aiogram 3 + SQLite) — в `bot/`, на сервере пока живёт отдельно в `/root/flood` (контейнер `flood-bot-1`). Боевой токен локально не использовать: второй polling выбьет прод-бота. `bot/database/bot.db.bak_*_server` — бэкап боевой базы, в git не идёт (там персданные актива, как и в `*.xlsx`).
+Бот (бывший flood, aiogram 3 + SQLite) — в `bot/`, на сервере входит в тот же `docker-compose.yml`, что и трекер, в `/root/ik-tracker-live`. База в `bot/database/bot.db` разделяется с бэкендом через `BOT_DATA_DIR`; кэш Whisper — в `bot/whisper-cache`. Старый `/root/flood` оставлен остановленным для отката. Боевой токен локально не использовать: второй polling выбьет прод-бота. Бэкапы боевой базы и персональные выгрузки в git не идут.
 
 Текстовая «Мафия» (`!мафия`, `/mafia`) — `bot/handlers/command_mafia.py`, правила в `bot/utils/mafia.py`, сохранение в отдельной `database/mafia_sessions.db` через `bot/database/mafia_store.py`. Роутер сам подключает таймер startup/shutdown. Правила и запуск тестов — `bot/docs/mafia.md`; тесты `bot/tests/test_mafia.py` не обращаются к Telegram.
 

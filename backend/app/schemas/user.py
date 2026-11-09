@@ -24,6 +24,7 @@ class UserUpdate(BaseModel):
     is_zavod: bool | None = None
     # В активе (передаётся при изменении).
     is_activist: bool | None = None
+    can_issue_checklists: bool | None = None
     # Направления участника (передаётся при изменении, [] — снять все).
     direction_ids: list[int] | None = None
     # Сброс пароля админом (необязательно).
@@ -42,6 +43,7 @@ class UserOut(BaseModel):
     is_editorial: bool = False
     is_zavod: bool = False
     is_activist: bool = False
+    can_issue_checklists: bool = False
     direction_ids: list[int] = []
     # Вычисляется в роутах: True для админа и руководителей СМИ/Дизайна.
     # Нужно фронту, чтобы показать вкладку «Редакция» ревьюерам без личного флага.

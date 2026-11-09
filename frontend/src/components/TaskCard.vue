@@ -40,7 +40,7 @@ const AVATARS_SHOWN = 4
         </span>
         <span v-else class="chip chip--private" title="Видят автор, исполнитель, админы и секретарь">
           <BaseIcon name="lock" :size="12" />
-          Поручение
+          {{ task.is_checklist ? 'Чек-лист' : 'Поручение' }}
         </span>
         <span class="prio" :class="`prio--${priorityMeta.tone}`">
           <span class="prio__mark" />{{ priorityMeta.label }}
@@ -48,12 +48,12 @@ const AVATARS_SHOWN = 4
       </div>
       <span v-if="showStatus" class="status">
         <span class="status__dot" :class="`status__dot--${statusMeta.color}`" />
-        {{ statusMeta.label }}
+        {{ task.is_checklist && task.status === 'todo' ? 'Не начато' : task.is_checklist && task.status === 'done' ? 'Сделано' : statusMeta.label }}
       </span>
     </header>
 
     <h3 class="task-card__title">{{ task.title }}</h3>
-    <p v-if="task.is_private && task.created_by" class="task-card__from">
+    <p v-if="(task.is_private || task.is_checklist) && task.created_by" class="task-card__from">
       от {{ task.created_by.full_name }}
     </p>
     <p v-if="task.description" class="task-card__desc">{{ task.description }}</p>

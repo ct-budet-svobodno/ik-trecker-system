@@ -10,12 +10,15 @@ const props = defineProps({
   stats: { type: Object, required: true },
   // null | статус | 'overdue'
   filter: { type: String, default: null },
+  checklist: { type: Boolean, default: false },
 })
+
+const steps = computed(() => props.checklist ? ['todo', 'in_progress', 'done'] : STATUS_STEPS)
 
 const emit = defineEmits(['update:filter'])
 
 const segments = computed(() =>
-  STATUS_STEPS.filter((status) => props.stats[status] > 0).map((status) => ({
+  steps.value.filter((status) => props.stats[status] > 0).map((status) => ({
     status,
     color: STATUS_META[status].color,
     width: (props.stats[status] / props.stats.total) * 100,
@@ -24,9 +27,9 @@ const segments = computed(() =>
 
 const chips = computed(() => [
   { value: null, label: 'Все', count: props.stats.total },
-  ...STATUS_STEPS.map((status) => ({
+  ...steps.value.map((status) => ({
     value: status,
-    label: STATUS_META[status].label,
+    label: props.checklist && status === 'todo' ? 'Не начато' : props.checklist && status === 'done' ? 'Сделано' : STATUS_META[status].label,
     count: props.stats[status],
     color: STATUS_META[status].color,
   })),

@@ -31,7 +31,7 @@ const error = ref('')
 const isEditing = ref(false)
 
 async function removeTask() {
-  const what = props.task.is_private ? 'поручение' : 'ТЗ'
+  const what = props.task.is_checklist ? 'чек-лист' : props.task.is_private ? 'поручение' : 'ТЗ'
   if (!window.confirm(`Удалить ${what} «${props.task.title}»? Исполнителям придёт уведомление об отмене.`)) return
   isBusy.value = true
   error.value = ''
@@ -81,8 +81,11 @@ async function onRemoveComment({ id }) {
 onMounted(loadComments)
 
 const priorityMeta = computed(() => PRIORITY_META[props.task.priority])
-const stepIndex = computed(() => STATUS_STEPS.indexOf(props.task.status))
-const nextStep = computed(() => NEXT_STEP[props.task.status])
+const statusSteps = computed(() => props.task.is_checklist ? ['todo', 'in_progress', 'done'] : STATUS_STEPS)
+const stepIndex = computed(() => statusSteps.value.indexOf(props.task.status))
+const nextStep = computed(() => props.task.is_checklist
+  ? ({ todo: { status: 'in_progress', label: 'В работе' }, in_progress: { status: 'done', label: 'Сделано' }, done: { status: 'in_progress', label: 'В работе' } })[props.task.status]
+  : NEXT_STEP[props.task.status])
 const overdue = computed(() => isOverdue(props.task))
 
 // Поручение нескольким: у каждого исполнителя свой статус. Исполнитель видит
@@ -99,6 +102,7 @@ const authorOfTeam = computed(() => isTeam.value && isAuthor.value && !myPart.va
 // исполнители, обычную задачу — руководители и исполнитель.
 const canChangeStatus = computed(() => {
   const me = authStore.user?.id
+  if (props.task.is_checklist) return props.task.assignee?.id === me
   if (props.task.is_private) {
     if (authorOfTeam.value) return false
     return !!myPart.value || props.task.assignee?.id === me || isAuthor.value
@@ -206,7 +210,7 @@ async function setStatus(status) {
         </span>
         <span v-else class="sheet__chip sheet__chip--private">
           <BaseIcon name="lock" :size="12" />
-          Поручение
+          {{ task.is_checklist ? 'Чек-лист' : 'Поручение' }}
         </span>
         <span class="sheet__prio" :class="`sheet__prio--${priorityMeta.tone}`">
           {{ priorityMeta.label }} приоритет
@@ -236,7 +240,7 @@ async function setStatus(status) {
       <!-- Шаги: пройденные закрашены, текущий подсвечен. Нажатие — перейти на шаг. -->
       <div class="steps" :class="{ 'steps--readonly': !canChangeStatus }">
         <button
-          v-for="(status, idx) in STATUS_STEPS"
+          v-for="(status, idx) in statusSteps"
           :key="status"
           class="step"
           :class="{
@@ -248,7 +252,7 @@ async function setStatus(status) {
           @click="setStatus(status)"
         >
           <span class="step__bar" />
-          <span class="step__label">{{ STEP_LABELS[status] }}</span>
+          <span class="step__label">{{ task.is_checklist && status === 'todo' ? 'Не начато' : task.is_checklist && status === 'done' ? 'Сделано' : STEP_LABELS[status] }}</span>
         </button>
       </div>
 

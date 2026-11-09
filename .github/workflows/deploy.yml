@@ -45,7 +45,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PATH: /root/ik-tracker-live
         run: |
           set -euo pipefail
           PORT="${DEPLOY_PORT:-22}"
@@ -54,6 +54,6 @@ jobs:
              cd '$DEPLOY_PATH'
              git fetch origin main
              git checkout main
-             git pull --ff-only origin main
+             git merge --ff-only origin/main
              docker compose up -d --build
              docker compose ps"

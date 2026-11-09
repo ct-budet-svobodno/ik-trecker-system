@@ -1,3 +1,5 @@
+name: task-trecker-ik
+
 services:
   backend:
     build: ./backend
@@ -19,8 +21,8 @@ services:
       # Группа-архив для анкет новых участников с фото (бот должен в ней состоять).
       # Пусто — анкеты видны только админам в трекере.
       TELEGRAM_ANKETA_CHAT_ID: ${TELEGRAM_ANKETA_CHAT_ID:-}
-      # База бота flood: одобренные анкеты из мини-аппа дописываются туда (для !инфо).
-      # На сервере в .env: BOT_DATA_DIR=/root/flood/database, BOT_DB_PATH=/bot-data/bot.db.
+      # Общая база бота: одобренные анкеты из мини-аппа дописываются туда (для !инфо).
+      # На сервере BOT_DATA_DIR указывает на bot/database этого деплоя.
       BOT_DB_PATH: ${BOT_DB_PATH:-}
     volumes:
       - backend_data:/app/data
@@ -35,9 +37,17 @@ services:
       retries: 5
       start_period: 15s
 
-  # Своего процесса бота у трекера нет: токен общий с ботом flood, а getUpdates
-  # у одного токена может слушать только один процесс. Бэкенд по токену лишь
-  # шлёт уведомления и проверяет вход из мини-аппа.
+  # Один процесс polling для общего Telegram-токена. Бэкенд по тому же токену
+  # только шлёт уведомления и проверяет вход из мини-аппа.
+  bot:
+    build: ./bot
+    container_name: ik-tracker-bot
+    restart: unless-stopped
+    env_file:
+      - ${BOT_ENV_FILE:-./bot/.env}
+    volumes:
+      - ${BOT_DATA_DIR:-./bot/database}:/app/database
+      - ${BOT_WHISPER_CACHE_DIR:-./bot/whisper-cache}:/app/whisper-cache
 
   frontend:
     build: ./frontend

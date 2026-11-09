@@ -147,6 +147,7 @@ function openEdit(user) {
     is_editorial: user.is_editorial,
     is_zavod: user.is_zavod,
     is_activist: user.is_activist,
+    can_issue_checklists: user.can_issue_checklists,
     memberIds: [...user.direction_ids],
     password: '',
     // id направлений, где он руководитель (для чекбоксов).
@@ -171,6 +172,7 @@ async function submitEdit() {
       is_editorial: e.is_editorial,
       is_zavod: e.is_zavod,
       is_activist: e.is_activist,
+      can_issue_checklists: e.can_issue_checklists,
       direction_ids: e.memberIds,
       leadership_position: e.leadership_position || null,
     }
@@ -378,6 +380,10 @@ async function submitEdit() {
         <label class="modal__check">
           <input v-model="editing.is_activist" type="checkbox" />
           В активе
+        </label>
+        <label class="modal__check">
+          <input v-model="editing.can_issue_checklists" type="checkbox" :disabled="!editing.is_activist" />
+          Может выдавать чек-листы
         </label>
 
         <label>Состоит в направлениях</label>

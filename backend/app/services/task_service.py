@@ -46,7 +46,7 @@ def can_issue_to(db: Session, user: User, direction_id: int | None) -> bool:
 def can_manage(task: Task, user: User) -> bool:
     """Кто правит и удаляет задачу. Поручение — только автор. ТЗ — выдавший,
     руководитель его направления, админы и руководство."""
-    if task.is_private:
+    if task.is_checklist or task.is_private:
         return task.created_by_id == user.id
     if _is_leadership(user) or task.created_by_id == user.id:
         return True
@@ -118,7 +118,7 @@ def _notify_assignees(db: Session, task: Task, actor: User, user_ids: list[int])
         push_service.send_to_user(
             db,
             user_id,
-            title="Вам дали личное поручение" if task.is_private else "Вам выдали ТЗ",
+            title="Вам выдали чек-лист" if task.is_checklist else "Вам дали личное поручение" if task.is_private else "Вам выдали ТЗ",
             body=task.title,
             url=task_url(task),
         )
@@ -130,9 +130,14 @@ def _check_users(db: Session, user_ids: list[int]) -> None:
 
 
 def create_task(db: Session, task_create: TaskCreate, created_by: User) -> Task:
-    if task_create.is_private and not can_assign_private(created_by):
+    if task_create.is_checklist:
+        if not (created_by.role == UserRole.ADMIN or (created_by.is_activist and created_by.can_issue_checklists)):
+            raise TaskAccessError("Нет права выдавать чек-листы")
+        if task_create.assignee_id == created_by.id:
+            raise TaskAssigneeError("Назначьте чек-лист другому человеку")
+    elif task_create.is_private and not can_assign_private(created_by):
         raise PrivateTaskAccessError("Личные поручения выдаёт только руководство")
-    if not task_create.is_private and not can_issue_to(db, created_by, task_create.direction_id):
+    elif not task_create.is_private and not can_issue_to(db, created_by, task_create.direction_id):
         raise TaskAccessError("ТЗ можно выдавать только в направление, которым вы руководите")
     if task_create.assignee_id is not None:
         _check_users(db, task_create.assignee_ids or [task_create.assignee_id])
@@ -146,6 +151,7 @@ def create_task(db: Session, task_create: TaskCreate, created_by: User) -> Task:
         due_date=task_create.due_date,
         created_by_id=created_by.id,
         is_private=task_create.is_private,
+        is_checklist=task_create.is_checklist,
     )
     if task.is_private:
         task_repository.set_assignees(db, task, task_create.assignee_ids)
@@ -157,6 +163,33 @@ def create_task(db: Session, task_create: TaskCreate, created_by: User) -> Task:
 
 def update_task(db: Session, task: Task, task_update: TaskUpdate, current_user: User) -> Task:
     fields = task_update.model_dump(exclude_unset=True)
+
+    if task.is_checklist:
+        if "status" in fields and fields["status"] not in (TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.DONE):
+            raise TaskFieldNotEditableError("У чек-листа три статуса: не начато, в работе, сделано")
+        if current_user.id == task.assignee_id and current_user.id != task.created_by_id:
+            if set(fields) - EMPLOYEE_EDITABLE_FIELDS:
+                raise TaskFieldNotEditableError("Исполнитель меняет только статус чек-листа")
+            return task_repository.update_fields(db, task, fields)
+        if current_user.id != task.created_by_id:
+            raise TaskFieldNotEditableError("Чек-лист меняют только автор и исполнитель")
+        if "status" in fields and current_user.id != task.assignee_id:
+            raise TaskFieldNotEditableError("Статус чек-листа меняет исполнитель")
+        if "direction_id" in fields and fields["direction_id"] is not None:
+            raise TaskFieldNotEditableError("У чек-листа нет направления")
+        if "assignee_ids" in fields or fields.get("assignee_id") is None and "assignee_id" in fields:
+            raise TaskFieldNotEditableError("Чек-листу нужен один исполнитель")
+        if "due_date" in fields and fields["due_date"] is None:
+            raise TaskFieldNotEditableError("Чек-листу нужен дедлайн")
+        if fields.get("assignee_id") is not None:
+            if fields["assignee_id"] == current_user.id:
+                raise TaskAssigneeError("Назначьте чек-лист другому человеку")
+            _check_users(db, [fields["assignee_id"]])
+        reassigned = "assignee_id" in fields and fields["assignee_id"] != task.assignee_id
+        task = task_repository.update_fields(db, task, fields)
+        if reassigned:
+            _notify_assignees(db, task, current_user, [task.assignee_id])
+        return task
 
     if task.is_private:
         return _update_private(db, task, fields, current_user)

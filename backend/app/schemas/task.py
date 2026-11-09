@@ -42,9 +42,15 @@ class TaskCreate(BaseModel):
     assignee_ids: list[int] | None = Field(default=None, max_length=MAX_ASSIGNEES)
     due_date: date | None = None
     is_private: bool = False
+    is_checklist: bool = False
 
     @model_validator(mode="after")
     def _validate(self):
+        if self.is_checklist:
+            if self.is_private or self.assignee_ids or self.assignee_id is None or self.due_date is None:
+                raise ValueError("Чек-листу нужны один исполнитель и дедлайн")
+            self.direction_id = None
+            return self
         if self.is_private:
             ids = _unique(self.assignee_ids or ([self.assignee_id] if self.assignee_id else []))
             if not ids:
@@ -91,6 +97,7 @@ class TaskOut(BaseModel):
     due_date: date | None
     direction: DirectionOut | None
     is_private: bool
+    is_checklist: bool = False
     assignee: AssigneeSummary | None
     # Исполнители поручения со своими статусами (у обычной задачи — пусто).
     assignees: list[TaskAssigneeOut] = []

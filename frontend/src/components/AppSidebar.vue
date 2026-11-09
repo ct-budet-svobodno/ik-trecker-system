@@ -31,7 +31,8 @@ const activeDirectionId = computed(() =>
   route.query.direction ? Number(route.query.direction) : null,
 )
 
-const totalCount = computed(() => tasksStore.tasks.filter((task) => !task.is_private).length)
+const totalCount = computed(() => tasksStore.tasks.filter((task) => !task.is_private && !task.is_checklist).length)
+const checklistCount = computed(() => tasksStore.tasks.filter((task) => task.is_checklist && (authStore.isAdmin || task.created_by_id === authStore.user?.id || task.assignee?.id === authStore.user?.id)).length)
 
 const privateCount = computed(() => {
   const uid = authStore.user?.id
@@ -51,10 +52,12 @@ const isMyTasksActive = computed(
     route.name === 'tasks' &&
     activeDirectionId.value === null &&
     route.query.all !== '1' &&
-    route.query.private !== '1',
+    route.query.private !== '1' &&
+    route.query.checklist !== '1',
 )
 const isPrivateActive = computed(() => route.name === 'tasks' && route.query.private === '1')
 const isAllTasksActive = computed(() => route.name === 'tasks' && route.query.all === '1')
+const isChecklistActive = computed(() => route.name === 'tasks' && route.query.checklist === '1')
 
 const countsByDirectionId = computed(() => {
   const counts = new Map()
@@ -80,6 +83,10 @@ function goToPrivate() {
 
 function goToAllTasks() {
   router.push({ name: 'tasks', query: { all: '1' } })
+}
+
+function goToChecklists() {
+  router.push({ name: 'tasks', query: { checklist: '1' } })
 }
 
 function goToMyDay() {
@@ -161,6 +168,11 @@ function handleLogout() {
         <span class="nav-item__dot nav-item__dot--all" />
         <span class="nav-item__name">Все ТЗ</span>
         <span class="nav-item__count">{{ totalCount }}</span>
+      </button>
+      <button class="nav-item" :class="{ 'nav-item--active': isChecklistActive }" @click="goToChecklists">
+        <span class="nav-item__dot nav-item__dot--all" />
+        <span class="nav-item__name">Чек-листы задач</span>
+        <span class="nav-item__count">{{ checklistCount }}</span>
       </button>
       <button
         v-if="authStore.isLeadership"

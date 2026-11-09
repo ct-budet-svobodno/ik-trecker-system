@@ -5,13 +5,15 @@ import { useAuthStore } from '../stores/auth'
 
 // Только для локальной разработки (подключается в App.vue под import.meta.env.DEV,
 // в прод-сборку не попадает). Вход под тестовыми аккаунтами одним нажатием.
-// Аккаунты создаёт backend/scripts/seed_test_roles.py — держать списки в согласии.
+// Тестовые аккаунты создаёт seed_test_roles.py, d.k — seed_demo_tasks.py.
 const ACCOUNTS = [
+  { username: 't.admin', password: 'test12345', label: 'Администратор' },
   { username: 'admin', password: 'admin123', label: 'Админ' },
   { username: 't.chairman', password: 'test12345', label: 'Председатель' },
   { username: 't.secretary', password: 'test12345', label: 'Секретарь' },
   { username: 't.head', password: 'test12345', label: 'Руководитель НВК' },
   { username: 't.activist', password: 'test12345', label: 'Активист' },
+  { username: 'd.k', password: 'demo12345', label: 'Исполнитель Денис' },
   { username: 't.editorial', password: 'test12345', label: 'Активист Редакции' },
 ]
 

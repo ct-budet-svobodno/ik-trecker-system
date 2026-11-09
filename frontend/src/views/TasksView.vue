@@ -127,6 +127,7 @@ const showAllPosts = ref(false)
 const statusFilter = ref(null)
 const searchQuery = ref('')
 const showCreateModal = ref(false)
+const createChecklist = ref(false)
 const viewMode = ref('grid')
 
 // Открытая в шторке задача. Держим id, а саму задачу берём из стора —
@@ -156,6 +157,7 @@ const dragOverStatus = ref(null)
 const dragError = ref('')
 
 const canCreateTask = computed(() => ['admin', 'manager'].includes(authStore.user?.role))
+const canCreateChecklist = computed(() => authStore.isAdmin || (authStore.user?.is_activist && authStore.user?.can_issue_checklists))
 
 onMounted(async () => {
   await tasksStore.loadAll()
@@ -172,13 +174,18 @@ const activeDirection = computed(
 // поручения) → mine (дефолт при входе).
 const scope = computed(() => {
   if (activeDirectionId.value !== null) return 'direction'
+  if (route.query.checklist === '1') return 'checklist'
   if (route.query.all === '1') return 'all'
   if (route.query.private === '1') return 'private'
   return 'mine'
 })
+const statusColumns = computed(() => scope.value === 'checklist' ? ['todo', 'in_progress', 'done'] : STATUS_COLUMNS)
 
 // Базовый набор задач для текущей области (до фильтров статуса и поиска).
 const scopedTasks = computed(() => {
+  if (scope.value === 'checklist') {
+    return tasksStore.tasks.filter((task) => task.is_checklist && (authStore.isAdmin || task.created_by_id === authStore.user?.id || task.assignee?.id === authStore.user?.id))
+  }
   if (scope.value === 'direction') {
     return tasksStore.tasks.filter((task) => task.direction?.id === activeDirectionId.value)
   }
@@ -189,14 +196,15 @@ const scopedTasks = computed(() => {
     // Админы и секретарь видят все поручения, остальные — только выданные ими.
     return tasksStore.tasks.filter(
       (task) =>
-        task.is_private && (authStore.seesAllPrivate || task.created_by_id === authStore.user?.id),
+        task.is_private && !task.is_checklist && (authStore.seesAllPrivate || task.created_by_id === authStore.user?.id),
     )
   }
   // «Все ТЗ» — сводка по направлениям; личные поручения живут вне них.
-  return tasksStore.tasks.filter((task) => !task.is_private)
+  return tasksStore.tasks.filter((task) => !task.is_private && !task.is_checklist)
 })
 
 const heading = computed(() => {
+  if (scope.value === 'checklist') return { crumb: 'Чек-листы задач', title: 'Чек-листы задач', subtitle: 'Выданные вами и назначенные вам задачи' }
   if (scope.value === 'direction') {
     return {
       crumb: activeDirection.value?.name ?? '—',
@@ -250,6 +258,7 @@ const visibleTasks = computed(() => {
 
 function handleTaskCreated(task) {
   tasksStore.addTask(task)
+  if (task.is_checklist) router.push({ name: 'tasks', query: { checklist: '1' } })
 }
 
 const tasksByStatus = computed(() => {
@@ -262,6 +271,7 @@ const tasksByStatus = computed(() => {
 
 // Двигать статус можно своей задачей или той, которой управляешь (права — с бэка).
 function canMove(task) {
+  if (task.is_checklist) return task.assignee?.id === authStore.user?.id
   return task.can_manage || isAssignedTo(task, authStore.user?.id)
 }
 
@@ -288,7 +298,7 @@ async function onDrop(status) {
   if (taskId == null) return
 
   const task = tasksStore.tasks.find((t) => t.id === taskId)
-  if (!task || task.status === status) return
+  if (!task || task.status === status || (task.is_checklist && status === 'in_review')) return
 
   try {
     await tasksStore.setTaskStatus(taskId, status)
@@ -313,9 +323,13 @@ async function onDrop(status) {
           <p class="subtitle">{{ heading.subtitle }}</p>
         </div>
         <div class="page-head__side">
-          <button v-if="canCreateTask" class="create-btn" @click="showCreateModal = true">
+          <button v-if="canCreateTask" class="create-btn" @click="createChecklist = false; showCreateModal = true">
             <BaseIcon name="plus" :size="16" />
             Выдать ТЗ
+          </button>
+          <button v-if="canCreateChecklist" class="create-btn" @click="createChecklist = true; showCreateModal = true">
+            <BaseIcon name="plus" :size="16" />
+            Выдать чек-лист
           </button>
         </div>
       </div>
@@ -335,6 +349,9 @@ async function onDrop(status) {
           @click="setScope('all')"
         >
           Все ТЗ
+        </button>
+        <button class="scope-switch__btn" :class="{ 'scope-switch__btn--active': scope === 'checklist' }" @click="router.push({ name: 'tasks', query: { checklist: '1' } })">
+          Чек-листы задач
         </button>
         <button
           v-if="scope === 'direction'"
@@ -419,12 +436,12 @@ async function onDrop(status) {
       </div>
 
       <template v-else>
-        <TaskProgress v-model:filter="statusFilter" :stats="stats" />
+        <TaskProgress v-model:filter="statusFilter" :stats="stats" :checklist="scope === 'checklist'" />
 
         <div class="controls-row">
           <label class="search">
             <BaseIcon class="search__icon" name="search" :size="16" />
-            <input v-model="searchQuery" class="search__input" type="text" placeholder="Поиск по ТЗ…" />
+            <input v-model="searchQuery" class="search__input" type="text" :placeholder="scope === 'checklist' ? 'Поиск по чек-листам…' : 'Поиск по ТЗ…'" />
           </label>
 
           <div class="view-toggle">
@@ -461,9 +478,9 @@ async function onDrop(status) {
         </template>
 
         <template v-else>
-          <div class="kanban-board">
+          <div class="kanban-board" :class="{ 'kanban-board--checklist': scope === 'checklist' }">
             <section
-              v-for="status in STATUS_COLUMNS"
+              v-for="status in statusColumns"
               :key="status"
               class="kanban-column"
               :class="{ 'kanban-column--drag-over': dragOverStatus === status }"
@@ -474,7 +491,7 @@ async function onDrop(status) {
             >
               <div class="kanban-column__header">
                 <span class="kanban-dot" :class="`kanban-dot--${STATUS_META[status].color}`" />
-                <span class="kanban-column__title">{{ STATUS_META[status].label }}</span>
+                <span class="kanban-column__title">{{ scope === 'checklist' && status === 'todo' ? 'Не начато' : scope === 'checklist' && status === 'done' ? 'Сделано' : STATUS_META[status].label }}</span>
                 <span class="kanban-column__count">{{ tasksByStatus[status].length }}</span>
               </div>
 
@@ -503,6 +520,7 @@ async function onDrop(status) {
       v-if="showCreateModal"
       :directions="tasksStore.directions"
       :private-by-default="scope === 'private'"
+      :checklist-by-default="createChecklist"
       @close="showCreateModal = false"
       @created="handleTaskCreated"
     />
@@ -763,6 +781,10 @@ async function onDrop(status) {
   grid-template-columns: repeat(4, minmax(240px, 1fr));
   gap: 16px;
   align-items: start;
+}
+
+.kanban-board--checklist {
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
 }
 
 .kanban-column {

@@ -39,6 +39,7 @@ class Task(Base):
     # Личное поручение руководства: видят автор, исполнители, админы и секретарь.
     # См. task_repository.list_visible_for.
     is_private: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_checklist: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # У поручения исполнителей может быть несколько — они в task_assignees,
     # здесь первый из них (для карточек и старых клиентов). Статус поручения —
     # сводный по исполнителям (см. task_service.overall_status).
