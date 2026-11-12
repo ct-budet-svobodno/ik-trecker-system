@@ -67,3 +67,9 @@ volumes:
   backend_data:
   frontend_node_modules:
   bot_whisper_cache:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
