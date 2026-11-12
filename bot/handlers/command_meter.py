@@ -10,14 +10,13 @@ import random
 from aiogram import Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import BaseFilter
-from aiogram.types import BufferedInputFile, Message
+from aiogram.types import Message
 
 from database.engine import async_session_maker
 from database.meter_dao import MeterDAO
 from utils.format import DIVIDER
 from utils.helpers import moscow_today
 from utils.names import display_name
-from utils.valyny_image import render_valyny_image
 from utils.valyny_widget import SendWidget, render_valyny_widget, valyny_caption
 
 meter_router = Router()
@@ -98,6 +97,9 @@ async def valyny_cmd(message: Message):
         return
     rows = [(row.display or "без имени", row.size) for row in top]
     caption = valyny_caption(rows)
+    if message.chat.type in ("group", "supergroup"):
+        await message.answer(caption, parse_mode=None)
+        return
     try:
         widget_html = render_valyny_widget(rows, moscow_today().strftime("%d.%m.%Y"))
         await message.bot(SendWidget(
@@ -111,16 +113,7 @@ async def valyny_cmd(message: Message):
         return
     except (TelegramAPIError, ValueError) as exc:
         logger.warning("Valyny widget unavailable: %s: %s", type(exc).__name__, getattr(exc, "message", str(exc))[:200])
-    try:
-        image = render_valyny_image(rows, moscow_today().strftime("%d.%m.%Y"))
-        await message.answer_photo(
-            BufferedInputFile(image, filename="valyny-ik.png"),
-            caption=caption,
-            parse_mode=None,
-        )
-    except (TelegramAPIError, OSError, ValueError) as exc:
-        logger.warning("Valyny image unavailable: %s: %s", type(exc).__name__, getattr(exc, "message", str(exc))[:200])
-        await message.answer(caption, parse_mode=None)
+    await message.answer(caption, parse_mode=None)
 
 
 @meter_router.message(Exact("!антивалыны"))

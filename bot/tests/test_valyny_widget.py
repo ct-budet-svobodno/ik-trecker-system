@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, patch
 from aiogram.exceptions import TelegramBadRequest
 
 from handlers.command_meter import valyny_cmd
-from utils.valyny_image import render_valyny_image
 from utils.valyny_widget import SendWidget, render_valyny_widget, valyny_caption
 
 
@@ -29,6 +28,7 @@ class ValynyWidgetTests(unittest.TestCase):
         self.assertEqual(source.count('class="page"'), 3)
         self.assertIn('id="next"', source)
         self.assertIn('1 / 4', source)
+        self.assertLess(source.index('id="next"'), source.index('class="pages"'))
         self.assertLessEqual(len(source.encode("utf-8")), 32_768)
         self.assertLessEqual(len(zlib.compress(source.encode("utf-8"), 9)), 4_096)
 
@@ -44,14 +44,8 @@ class ValynyWidgetTests(unittest.TestCase):
         self.assertEqual(method.width, 360)
         self.assertEqual(method.caption, "Топ")
 
-    def test_image_fallback_is_a_png(self):
-        image = render_valyny_image([("Участник ИК", 27)], "12.11.2026")
-        self.assertTrue(image.startswith(b"\x89PNG\r\n\x1a\n"))
-        self.assertLess(len(image), 10_000_000)
-
-
 class ValynyCommandTests(unittest.IsolatedAsyncioTestCase):
-    async def _run_command(self, bot_side_effect=None, photo_side_effect=None):
+    async def _run_command(self, bot_side_effect=None, chat_type="private"):
         @asynccontextmanager
         async def session():
             yield object()
@@ -59,9 +53,8 @@ class ValynyCommandTests(unittest.IsolatedAsyncioTestCase):
         message = SimpleNamespace(
             bot=AsyncMock(side_effect=bot_side_effect),
             answer=AsyncMock(),
-            answer_photo=AsyncMock(side_effect=photo_side_effect),
             reply=AsyncMock(),
-            chat=SimpleNamespace(id=-100123),
+            chat=SimpleNamespace(id=123 if chat_type == "private" else -100123, type=chat_type),
             message_thread_id=42,
         )
         dao = SimpleNamespace(top=AsyncMock(return_value=[
@@ -78,25 +71,22 @@ class ValynyCommandTests(unittest.IsolatedAsyncioTestCase):
         dao.top.assert_awaited_once_with(limit=None)
         method = message.bot.await_args.args[0]
         self.assertIsInstance(method, SendWidget)
-        self.assertEqual(method.chat_id, -100123)
+        self.assertEqual(method.chat_id, 123)
         self.assertEqual(method.message_thread_id, 42)
         self.assertIn("&lt;ИК&gt;", method.html)
-        message.answer_photo.assert_not_awaited()
         message.answer.assert_not_awaited()
 
-    async def test_sends_image_when_widget_method_is_unavailable(self):
+    async def test_sends_plain_text_in_group_without_requesting_widget(self):
+        message, _ = await self._run_command(chat_type="supergroup")
+        message.bot.assert_not_awaited()
+        self.assertIn("<ИК>", message.answer.await_args.args[0])
+        self.assertIsNone(message.answer.await_args.kwargs["parse_mode"])
+
+    async def test_sends_text_when_widget_method_is_unavailable(self):
         error = TelegramBadRequest(
-            method=SendWidget(chat_id=-100123, html="test"), message="Not Found"
+            method=SendWidget(chat_id=123, html="test"), message="Not Found"
         )
         message, _ = await self._run_command(bot_side_effect=error)
-        self.assertEqual(message.answer_photo.await_count, 1)
-        message.answer.assert_not_awaited()
-
-    async def test_sends_text_if_image_is_also_unavailable(self):
-        error = TelegramBadRequest(
-            method=SendWidget(chat_id=-100123, html="test"), message="Not Found"
-        )
-        message, _ = await self._run_command(bot_side_effect=error, photo_side_effect=OSError("no image"))
         self.assertIn("<ИК>", message.answer.await_args.args[0])
         self.assertEqual(message.answer.await_args.kwargs["parse_mode"], None)
 

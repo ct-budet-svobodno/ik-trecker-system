@@ -34,7 +34,6 @@ body{margin:0;background:#131019;color:#f1f0f5;font:14px/1.3 system-ui,sans-seri
 .rule{height:3px;margin:15px 0;background:linear-gradient(90deg,#cb77ab,#ff9934,#2dd4bf);border-radius:4px}
 h1{margin:0 0 3px;font-size:23px;line-height:1.1;letter-spacing:-.03em}
 .sub{margin:0 0 15px;color:#a6a1b4;font-size:12px}
-.pages{min-height:425px}
 .page{display:none;gap:5px}
 .page.active{display:grid}
 .row{display:flex;align-items:center;gap:9px;min-height:38px;padding:6px 9px;border:1px solid #302e3f;border-radius:10px;background:#1b1a24}
@@ -46,7 +45,7 @@ h1{margin:0 0 3px;font-size:23px;line-height:1.1;letter-spacing:-.03em}
 .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .size{flex:0 0 auto;color:#2dd4bf;font-size:17px;font-weight:900;white-space:nowrap}
 .size small{font-size:10px;font-weight:700}
-.nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:13px}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 12px}
 .nav button{padding:8px 11px;border:1px solid #8b5cf6;border-radius:9px;background:#302448;color:#f1f0f5;font:700 12px system-ui,sans-serif}
 .nav button:disabled{border-color:#302e3f;background:#1b1a24;color:#726e82}
 .nav span{color:#a6a1b4;font-size:12px;font-weight:700}
@@ -106,7 +105,7 @@ def render_valyny_widget(rows: Sequence[tuple[str, int]], date_label: str) -> st
         + f'<span class="date">{safe_date}</span></div>'
         + '<div class="rule"></div><h1>Рейтинг валын ИК</h1>'
         + f'<p class="sub">Все участники: {len(rows)} · команда !метр</p>'
-        + '<div class="pages">' + page_html + '</div>' + navigation
+        + navigation + '<div class="pages">' + page_html + '</div>'
         + '<div class="foot"><span>РЕЙТИНГ НА МОМЕНТ ЗАПРОСА</span><b>!МЕТР ↗</b></div>'
         + '</div>' + (_PAGING_SCRIPT if len(pages) > 1 else "") + '</html>'
     )
