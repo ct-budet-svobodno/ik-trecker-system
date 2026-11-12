@@ -115,6 +115,7 @@ def render_my_tasks_widget(name: str, tasks: list[MyTask], today: date | None = 
         + '<span class="eyebrow">ИНФОРМАЦИОННЫЙ КОМИТЕТ</span></div>'
         + f'<span class="date">{today:%d.%m.%Y}</span></div><div class="rule"></div>'
         + '<h1>Мои задачи</h1>'
+        + f'<p class="sub">{first_name}, вот что тебе назначено</p>'
         + f'<div class="stats"><div class="stat"><b>{active}</b><small>Активные</small></div>'
         + f'<div class="stat progress"><b>{progress}</b><small>В работе</small></div>'
         + f'<div class="stat done-count"><b>{done}</b><small>Сделано</small></div></div>'
