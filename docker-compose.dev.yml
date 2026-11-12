@@ -56,9 +56,12 @@ services:
     env_file:
       - path: ./bot/.env
         required: false
+    environment:
+      TRACKER_DB_PATH: /tracker-data/ik_tracker.db
     volumes:
       - ./bot/database:/app/database
       - bot_whisper_cache:/app/whisper-cache
+      - backend_data:/tracker-data:ro
 
 volumes:
   backend_data:
