@@ -92,7 +92,7 @@ async def metertop_cmd(message: Message):
 @meter_router.message(Exact("!валыны"))
 async def valyny_cmd(message: Message):
     async with async_session_maker() as session:
-        top = await MeterDAO(session).top()
+        top = await MeterDAO(session).top(limit=None)
     if not top:
         await message.reply("Валын ещё ни у кого нет. Начни с !метр 🍆")
         return

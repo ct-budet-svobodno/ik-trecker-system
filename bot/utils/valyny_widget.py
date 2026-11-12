@@ -34,7 +34,9 @@ body{margin:0;background:#131019;color:#f1f0f5;font:14px/1.3 system-ui,sans-seri
 .rule{height:3px;margin:15px 0;background:linear-gradient(90deg,#cb77ab,#ff9934,#2dd4bf);border-radius:4px}
 h1{margin:0 0 3px;font-size:23px;line-height:1.1;letter-spacing:-.03em}
 .sub{margin:0 0 15px;color:#a6a1b4;font-size:12px}
-.list{display:grid;gap:5px}
+.pages{min-height:425px}
+.page{display:none;gap:5px}
+.page.active{display:grid}
 .row{display:flex;align-items:center;gap:9px;min-height:38px;padding:6px 9px;border:1px solid #302e3f;border-radius:10px;background:#1b1a24}
 .row.first{border-color:#8b5cf6;background:#302448}
 .row.second{border-color:#cb77ab}
@@ -44,15 +46,37 @@ h1{margin:0 0 3px;font-size:23px;line-height:1.1;letter-spacing:-.03em}
 .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .size{flex:0 0 auto;color:#2dd4bf;font-size:17px;font-weight:900;white-space:nowrap}
 .size small{font-size:10px;font-weight:700}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:13px}
+.nav button{padding:8px 11px;border:1px solid #8b5cf6;border-radius:9px;background:#302448;color:#f1f0f5;font:700 12px system-ui,sans-serif}
+.nav button:disabled{border-color:#302e3f;background:#1b1a24;color:#726e82}
+.nav span{color:#a6a1b4;font-size:12px;font-weight:700}
 .foot{display:flex;justify-content:space-between;gap:8px;margin-top:14px;color:#a6a1b4;font-size:10px;font-weight:700;letter-spacing:.04em}
 .foot b{color:#ff9934}
 </style>"""
+
+_PAGING_SCRIPT = """<script>
+(function(){
+var pages=document.querySelectorAll('.page'),current=0;
+var previous=document.getElementById('prev'),next=document.getElementById('next');
+var counter=document.getElementById('counter');
+function show(index){
+  pages[current].classList.remove('active');
+  current=index;
+  pages[current].classList.add('active');
+  previous.disabled=current===0;
+  next.disabled=current===pages.length-1;
+  counter.textContent=(current+1)+' / '+pages.length;
+}
+previous.onclick=function(){if(current>0)show(current-1)};
+next.onclick=function(){if(current<pages.length-1)show(current+1)};
+})();
+</script>"""
 
 
 def render_valyny_widget(rows: Sequence[tuple[str, int]], date_label: str) -> str:
     """Render a snapshot; Telegram enforces 32 KB HTML and 4 KB zlib limits."""
     items = []
-    for rank, (name, size) in enumerate(rows[:10], 1):
+    for rank, (name, size) in enumerate(rows, 1):
         short_name = name[:47] + "…" if len(name) > 48 else name
         safe_name = html.escape(short_name or "без имени", quote=True)
         cls = ("first", "second", "third")[rank - 1] if rank <= 3 else ""
@@ -61,6 +85,17 @@ def render_valyny_widget(rows: Sequence[tuple[str, int]], date_label: str) -> st
             f'<span class="name">{safe_name}</span>'
             f'<span class="size">{int(size)} <small>СМ</small></span></div>'
         )
+    pages = [items[index:index + 10] for index in range(0, len(items), 10)] or [[]]
+    page_html = "".join(
+        f'<div class="page{" active" if index == 0 else ""}">{"".join(page)}</div>'
+        for index, page in enumerate(pages)
+    )
+    navigation = (
+        '<div class="nav"><button id="prev" disabled>← Назад</button>'
+        f'<span id="counter">1 / {len(pages)}</span>'
+        '<button id="next">Далее →</button></div>'
+        if len(pages) > 1 else ""
+    )
     safe_date = html.escape(date_label, quote=True)
     document = (
         '<!doctype html><html lang="ru"><meta charset="utf-8">'
@@ -69,11 +104,11 @@ def render_valyny_widget(rows: Sequence[tuple[str, int]], date_label: str) -> st
         + '<div class="card"><div class="top"><div class="mark"><span class="ik">ИК</span>'
         + '<span class="eyebrow">ИНФОРМАЦИОННЫЙ КОМИТЕТ</span></div>'
         + f'<span class="date">{safe_date}</span></div>'
-        + '<div class="rule"></div><h1>Топ валын ИК</h1>'
-        + '<p class="sub">Десятка лидеров по команде !метр</p>'
-        + '<div class="list">' + "".join(items) + '</div>'
+        + '<div class="rule"></div><h1>Рейтинг валын ИК</h1>'
+        + f'<p class="sub">Все участники: {len(rows)} · команда !метр</p>'
+        + '<div class="pages">' + page_html + '</div>' + navigation
         + '<div class="foot"><span>РЕЙТИНГ НА МОМЕНТ ЗАПРОСА</span><b>!МЕТР ↗</b></div>'
-        + '</div></html>'
+        + '</div>' + (_PAGING_SCRIPT if len(pages) > 1 else "") + '</html>'
     )
     source = document.encode("utf-8")
     if len(source) > 32_768 or len(zlib.compress(source, 9)) > 4_096:

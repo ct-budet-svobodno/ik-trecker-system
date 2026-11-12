@@ -14,9 +14,9 @@ from utils.valyny_widget import SendWidget, render_valyny_widget, valyny_caption
 
 
 class ValynyWidgetTests(unittest.TestCase):
-    def test_renders_top_ten_without_interpreting_names_as_html(self):
+    def test_renders_all_people_in_ten_person_pages_without_interpreting_names_as_html(self):
         rows = [("<script>alert(1)</script> & ИК", 123)] + [
-            (f"Участник {i}", i) for i in range(2, 13)
+            (f"Участник {i}", i) for i in range(2, 34)
         ]
         source = render_valyny_widget(rows, "12.11.2026")
 
@@ -24,7 +24,11 @@ class ValynyWidgetTests(unittest.TestCase):
         self.assertNotIn("<script>alert", source)
         self.assertIn("12.11.2026", source)
         self.assertIn("Участник 10", source)
-        self.assertNotIn("Участник 11", source)
+        self.assertIn("Участник 33", source)
+        self.assertEqual(source.count('class="page active"'), 1)
+        self.assertEqual(source.count('class="page"'), 3)
+        self.assertIn('id="next"', source)
+        self.assertIn('1 / 4', source)
         self.assertLessEqual(len(source.encode("utf-8")), 32_768)
         self.assertLessEqual(len(zlib.compress(source.encode("utf-8"), 9)), 4_096)
 
@@ -67,10 +71,11 @@ class ValynyCommandTests(unittest.IsolatedAsyncioTestCase):
             "handlers.command_meter.MeterDAO", return_value=dao
         ):
             await valyny_cmd(message)
-        return message
+        return message, dao
 
     async def test_sends_widget_in_the_command_topic(self):
-        message = await self._run_command()
+        message, dao = await self._run_command()
+        dao.top.assert_awaited_once_with(limit=None)
         method = message.bot.await_args.args[0]
         self.assertIsInstance(method, SendWidget)
         self.assertEqual(method.chat_id, -100123)
@@ -83,7 +88,7 @@ class ValynyCommandTests(unittest.IsolatedAsyncioTestCase):
         error = TelegramBadRequest(
             method=SendWidget(chat_id=-100123, html="test"), message="Not Found"
         )
-        message = await self._run_command(bot_side_effect=error)
+        message, _ = await self._run_command(bot_side_effect=error)
         self.assertEqual(message.answer_photo.await_count, 1)
         message.answer.assert_not_awaited()
 
@@ -91,7 +96,7 @@ class ValynyCommandTests(unittest.IsolatedAsyncioTestCase):
         error = TelegramBadRequest(
             method=SendWidget(chat_id=-100123, html="test"), message="Not Found"
         )
-        message = await self._run_command(bot_side_effect=error, photo_side_effect=OSError("no image"))
+        message, _ = await self._run_command(bot_side_effect=error, photo_side_effect=OSError("no image"))
         self.assertIn("<ИК>", message.answer.await_args.args[0])
         self.assertEqual(message.answer.await_args.kwargs["parse_mode"], None)
 

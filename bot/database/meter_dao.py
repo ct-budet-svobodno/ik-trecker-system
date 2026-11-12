@@ -39,8 +39,10 @@ class MeterDAO:
             return "down", row
         return "same", row
 
-    async def top(self, limit: int = 10) -> list[Meter]:
-        query = select(Meter).order_by(desc(Meter.size)).limit(limit)
+    async def top(self, limit: int | None = 10) -> list[Meter]:
+        query = select(Meter).order_by(desc(Meter.size), Meter.user_id.asc())
+        if limit is not None:
+            query = query.limit(limit)
         return list((await self.session.execute(query)).scalars().all())
 
     async def bottom(self, limit: int = 10) -> list[Meter]:

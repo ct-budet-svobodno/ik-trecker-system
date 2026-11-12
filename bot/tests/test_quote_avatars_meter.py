@@ -161,5 +161,6 @@ class MeterTests(unittest.IsolatedAsyncioTestCase):
                 rows = await MeterDAO(session).bottom()
                 self.assertEqual([r.size for r in rows], list(range(-5, 5)))
                 self.assertEqual(len(await MeterDAO(session).top()), 10)
+                self.assertEqual(len(await MeterDAO(session).top(limit=None)), 15)
         finally:
             await engine.dispose()
