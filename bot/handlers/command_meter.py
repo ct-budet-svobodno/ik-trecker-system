@@ -108,7 +108,7 @@ async def valyny_cmd(message: Message):
             message_thread_id=message.message_thread_id,
         ))
     except (TelegramAPIError, ValueError) as exc:
-        logger.warning("Valyny widget unavailable: %s", type(exc).__name__)
+        logger.warning("Valyny widget unavailable: %s: %s", type(exc).__name__, getattr(exc, "message", str(exc))[:200])
         await message.answer(caption, parse_mode=None)
 
 
