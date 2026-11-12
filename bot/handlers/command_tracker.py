@@ -24,7 +24,8 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import BaseFilter
 from aiogram.types import (
-    BotCommand, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, MenuButtonWebApp, Message, WebAppInfo,
+    BotCommand, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
+    MenuButtonWebApp, Message, ReplyKeyboardMarkup, WebAppInfo,
 )
 
 from utils.format import DIVIDER
@@ -151,15 +152,15 @@ def games_kb() -> InlineKeyboardMarkup:
     ])
 
 
-def tracker_button() -> InlineKeyboardButton:
-    return InlineKeyboardButton(text="📋 Открыть трекер", web_app=WebAppInfo(url=TRACKER_URL))
+def tracker_button() -> KeyboardButton:
+    return KeyboardButton(text="📋 Открыть трекер", web_app=WebAppInfo(url=TRACKER_URL))
 
 
-def tracker_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Мои задачи", callback_data="tracker:my_tasks")],
+def tracker_kb() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="✅ Мои задачи")],
         [tracker_button()],
-    ])
+    ], resize_keyboard=True, is_persistent=True)
 
 
 async def setup_menu_button(bot: Bot) -> None:
@@ -233,7 +234,7 @@ async def my_tasks_button(query: CallbackQuery):
         await _send_my_tasks(query.bot, query.from_user.id)
 
 
-@tracker_router.message(F.chat.type == "private", Exact("!мои задачи", "/tasks", "/mytasks"))
+@tracker_router.message(F.chat.type == "private", Exact("✅ Мои задачи", "Мои задачи", "!мои задачи", "/tasks", "/mytasks"))
 async def my_tasks_command(message: Message):
     if message.from_user:
         await _send_my_tasks(message.bot, message.from_user.id)
