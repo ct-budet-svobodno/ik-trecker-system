@@ -4,9 +4,11 @@
 Размер общий, не по чатам. В минус уходить можно — так даже смешнее.
 """
 import html
+import logging
 import random
 
 from aiogram import Router
+from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import BaseFilter
 from aiogram.types import Message
 
@@ -15,8 +17,10 @@ from database.meter_dao import MeterDAO
 from utils.format import DIVIDER
 from utils.helpers import moscow_today
 from utils.names import display_name
+from utils.valyny_widget import SendWidget, render_valyny_widget, valyny_caption
 
 meter_router = Router()
+logger = logging.getLogger(__name__)
 
 COOLDOWN = (
     "Твой писюн еще не готов к росту. Попробуй завтра.",
@@ -91,11 +95,21 @@ async def valyny_cmd(message: Message):
     if not top:
         await message.reply("Валын ещё ни у кого нет. Начни с !метр 🍆")
         return
-    lines = ["🍆 <b>Топ 10 валын ИК</b>", DIVIDER]
-    for i, row in enumerate(top, 1):
-        name = html.escape(row.display or "без имени")
-        lines.append(f"{i}. {name} — {row.size} СМ")
-    await message.answer("\n".join(lines), parse_mode="HTML")
+    rows = [(row.display or "без имени", row.size) for row in top]
+    caption = valyny_caption(rows)
+    try:
+        widget_html = render_valyny_widget(rows, moscow_today().strftime("%d.%m.%Y"))
+        await message.bot(SendWidget(
+            chat_id=message.chat.id,
+            html=widget_html,
+            width=360,
+            height=0,
+            caption=caption,
+            message_thread_id=message.message_thread_id,
+        ))
+    except (TelegramAPIError, ValueError) as exc:
+        logger.warning("Valyny widget unavailable: %s", type(exc).__name__)
+        await message.answer(caption, parse_mode=None)
 
 
 @meter_router.message(Exact("!антивалыны"))
