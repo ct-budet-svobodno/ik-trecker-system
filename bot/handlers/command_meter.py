@@ -10,13 +10,14 @@ import random
 from aiogram import Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import BaseFilter
-from aiogram.types import Message
+from aiogram.types import BufferedInputFile, Message
 
 from database.engine import async_session_maker
 from database.meter_dao import MeterDAO
 from utils.format import DIVIDER
 from utils.helpers import moscow_today
 from utils.names import display_name
+from utils.valyny_image import render_valyny_image
 from utils.valyny_widget import SendWidget, render_valyny_widget, valyny_caption
 
 meter_router = Router()
@@ -107,8 +108,18 @@ async def valyny_cmd(message: Message):
             caption=caption,
             message_thread_id=message.message_thread_id,
         ))
+        return
     except (TelegramAPIError, ValueError) as exc:
         logger.warning("Valyny widget unavailable: %s: %s", type(exc).__name__, getattr(exc, "message", str(exc))[:200])
+    try:
+        image = render_valyny_image(rows, moscow_today().strftime("%d.%m.%Y"))
+        await message.answer_photo(
+            BufferedInputFile(image, filename="valyny-ik.png"),
+            caption=caption,
+            parse_mode=None,
+        )
+    except (TelegramAPIError, OSError, ValueError) as exc:
+        logger.warning("Valyny image unavailable: %s: %s", type(exc).__name__, getattr(exc, "message", str(exc))[:200])
         await message.answer(caption, parse_mode=None)
 
 
