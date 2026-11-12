@@ -97,7 +97,7 @@ def render_my_tasks_widget(name: str, tasks: list[MyTask], today: date | None = 
             f'<div class="title">{html.escape(task.title[:160], quote=True)}</div>'
             f'<div class="due">{due}</div></div>'
         )
-    pages = [cards[i:i + 2] for i in range(0, len(cards), 2)] or [[
+    pages = [cards[i:i + 5] for i in range(0, len(cards), 5)] or [[
         '<div class="empty">Пока нет назначенных задач ✨</div>'
     ]]
     page_html = "".join(
@@ -119,6 +119,7 @@ def render_my_tasks_widget(name: str, tasks: list[MyTask], today: date | None = 
         + f'<div class="stats"><div class="stat"><b>{active}</b><small>Активные</small></div>'
         + f'<div class="stat progress"><b>{progress}</b><small>В работе</small></div>'
         + f'<div class="stat done-count"><b>{done}</b><small>Сделано</small></div></div>'
+        + nav + page_html
         + '</div>' + (_SCRIPT if len(pages) > 1 else "") + '</html>'
     )
     raw = source.encode("utf-8")

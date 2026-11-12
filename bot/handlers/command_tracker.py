@@ -220,10 +220,7 @@ async def _send_my_tasks(bot: Bot, chat_id: int) -> None:
     caption = my_tasks_caption(tasks)
     try:
         widget = render_my_tasks_widget(name, tasks)
-        # Telegram may keep the auto-height placeholder (about 256 px), clipping
-        # the task cards below the summary. Two cards fit in the fixed bubble.
-        height = 440 if len(tasks) <= 1 else 580
-        await bot(SendWidget(chat_id=chat_id, html=widget, width=360, height=height, caption=caption))
+        await bot(SendWidget(chat_id=chat_id, html=widget, width=360, height=0, caption=caption))
     except (TelegramAPIError, ValueError) as exc:
         logger.warning("My tasks widget unavailable: %s: %s", type(exc).__name__, str(exc)[:200])
         await bot.send_message(chat_id, caption, reply_markup=tracker_kb())
