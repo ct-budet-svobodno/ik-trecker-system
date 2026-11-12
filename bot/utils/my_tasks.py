@@ -4,8 +4,10 @@ import html
 import os
 import sqlite3
 import zlib
+from base64 import b64encode
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -44,13 +46,16 @@ def load_my_tasks(telegram_id: int) -> tuple[str | None, list[MyTask]]:
     return user["full_name"], tasks
 
 
+_LOGO_DATA = b64encode(Path(__file__).with_name("ik_logo_widget.png").read_bytes()).decode("ascii")
+
+
 _STYLE = """<style>
 *{box-sizing:border-box}body{margin:0;background:#131019;color:#f1f0f5;font:14px/1.5 'Golos Text',system-ui,'Segoe UI',sans-serif}
-.card{padding:18px;border:1px solid #3d3b50;border-radius:18px;background:linear-gradient(145deg,#232230,#131019 60%,#1b1a24)}
+.card{padding:18px;border:1px solid #3d3b50;border-radius:18px;background:radial-gradient(ellipse at -10% 45%,rgba(201,51,54,.22),transparent 55%),radial-gradient(ellipse at 45% 110%,rgba(232,134,60,.20),transparent 55%),radial-gradient(ellipse at 110% 45%,rgba(38,176,150,.18),transparent 55%),#131019}
 .top{display:flex;align-items:center;justify-content:space-between;gap:8px}.mark{display:flex;align-items:center;gap:9px;font-weight:900;letter-spacing:.06em}
-.ik{display:grid;place-items:center;width:37px;height:37px;border-radius:11px;background:#8b5cf6;color:white;font-size:18px}
+.ik{display:block;width:37px;height:37px;flex:none;object-fit:contain}
 .eyebrow{color:#a6a1b4;font:500 10px/1.4 'JetBrains Mono',ui-monospace,monospace;letter-spacing:.08em}.date{color:#a6a1b4;font:11px 'JetBrains Mono',ui-monospace,monospace}
-.rule{height:3px;margin:15px 0;background:linear-gradient(90deg,#cb77ab,#ff9934,#2dd4bf);border-radius:4px}
+.rule{height:3px;margin:15px 0;background:linear-gradient(90deg,#df4b51,#e8863c,#18b1ad);border-radius:4px}
 h1{margin:0 0 3px;font:500 21px/1.3 'Unbounded','Golos Text',system-ui,sans-serif;letter-spacing:-.01em}.sub{margin:0 0 14px;color:#a6a1b4;font-size:12px}
 .stats{display:flex;gap:7px;margin-bottom:13px}.stat{flex:1;padding:8px;border:1px solid #302e3f;border-radius:12px;background:#1b1a24;text-align:center}
 .stat b{display:block;font:500 18px 'JetBrains Mono',ui-monospace,monospace;color:#8b5cf6}.stat.progress b{color:#e0a85e}.stat.done-count b{color:#45c4a0}.stat small{font-size:10px;color:#a6a1b4}
@@ -106,7 +111,7 @@ def render_my_tasks_widget(name: str, tasks: list[MyTask], today: date | None = 
     source = (
         '<!doctype html><html lang="ru"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">' + _STYLE
-        + '<div class="card"><div class="top"><div class="mark"><span class="ik">ИК</span>'
+        + '<div class="card"><div class="top"><div class="mark"><img class="ik" alt="ИК" src="data:image/png;base64,' + _LOGO_DATA + '">'
         + '<span class="eyebrow">ИНФОРМАЦИОННЫЙ КОМИТЕТ</span></div>'
         + f'<span class="date">{today:%d.%m.%Y}</span></div><div class="rule"></div>'
         + '<h1>Мои задачи</h1>'
