@@ -97,7 +97,7 @@ def render_my_tasks_widget(name: str, tasks: list[MyTask], today: date | None = 
             f'<div class="title">{html.escape(task.title[:160], quote=True)}</div>'
             f'<div class="due">{due}</div></div>'
         )
-    pages = [cards[i:i + 5] for i in range(0, len(cards), 5)] or [[
+    pages = [cards[i:i + 2] for i in range(0, len(cards), 2)] or [[
         '<div class="empty">Пока нет назначенных задач ✨</div>'
     ]]
     page_html = "".join(
