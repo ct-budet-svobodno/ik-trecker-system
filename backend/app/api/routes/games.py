@@ -13,8 +13,10 @@ from app.schemas.bunker import (
     BunkerTableSaved,
 )
 from app.schemas.durak import DurakCreate, DurakListItem, DurakMove, DurakOut
+from app.schemas.poker import PokerMove, PokerVersion
 from app.schemas.sea_battle import SeaBattleCreate, SeaBattleListItem, SeaBattleMove, SeaBattleOut
-from app.services import bunker_service, durak_service, sea_battle_service
+from app.services import bunker_service, durak_service, poker_service, sea_battle_service
+from app.games import poker
 from app.services.exceptions import (
     BunkerMoveError,
     BunkerNotFoundError,
@@ -29,6 +31,80 @@ from app.services.exceptions import (
 
 # Раздел «Игры»: доступен всем вошедшим.
 router = APIRouter(dependencies=[Depends(get_current_user)])
+
+
+# ── Покер ──
+
+@router.get('/poker')
+def list_poker(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[dict]:
+    return [
+        {'code': game.code, 'status': game.status, 'players': len(game.state['players']),
+         'my_turn': game.state.get('turn') == next(
+             (i for i, p in enumerate(game.state['players']) if p['id'] == current_user.id), None)}
+        for game in poker_service.list_active(db, current_user)
+    ]
+
+
+@router.get('/poker/open')
+def list_open_poker(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[dict]:
+    return [
+        {'code': game.code, 'players': len(game.state['players']), 'host_name': game.state['players'][0]['name']}
+        for game in poker_service.list_open(db, current_user)
+    ]
+
+
+@router.post('/poker', status_code=status.HTTP_201_CREATED)
+def create_poker(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    return poker_service.view(poker_service.create(db, current_user), current_user)
+
+
+def _poker_action(action, *args) -> dict:
+    try:
+        return action(*args)
+    except poker_service.PokerNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except poker_service.PokerConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except poker.IllegalMove as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get('/poker/{code}')
+def get_poker(code: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    game = _poker_action(poker_service.get_for, db, current_user, code)
+    return poker_service.view(game, current_user)
+
+
+@router.post('/poker/{code}/join')
+def join_poker(code: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    return poker_service.view(_poker_action(poker_service.join, db, current_user, code), current_user)
+
+
+@router.post('/poker/{code}/leave')
+def leave_poker(code: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    return poker_service.view(_poker_action(poker_service.leave, db, current_user, code), current_user)
+
+
+@router.post('/poker/{code}/start')
+def start_poker(code: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    return poker_service.view(_poker_action(poker_service.start, db, current_user, code), current_user)
+
+
+@router.post('/poker/{code}/next')
+def next_poker(code: str, payload: PokerVersion, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    return poker_service.view(_poker_action(poker_service.next_hand, db, current_user, code, payload.version), current_user)
+
+
+@router.post('/poker/{code}/stop')
+def stop_poker(code: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    return poker_service.view(_poker_action(poker_service.stop, db, current_user, code), current_user)
+
+
+@router.post('/poker/{code}/move')
+def move_poker(code: str, payload: PokerMove, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    return poker_service.view(_poker_action(
+        poker_service.move, db, current_user, code, payload.version, payload.action, payload.amount
+    ), current_user)
 
 
 @router.get("/durak", response_model=list[DurakListItem])

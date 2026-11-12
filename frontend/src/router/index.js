@@ -115,6 +115,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/games/poker/:code',
+    name: 'poker',
+    component: () => import('../views/PokerView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     // Партия по коду — сюда же ведёт ссылка-приглашение из бота.
     path: '/games/durak/:code',
     name: 'durak',

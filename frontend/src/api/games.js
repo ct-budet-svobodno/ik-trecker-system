@@ -1,5 +1,40 @@
 import apiClient from './client'
 
+export async function fetchPokerGames() {
+  const response = await apiClient.get('/games/poker')
+  return response.data
+}
+
+export async function fetchOpenPokerGames() {
+  const response = await apiClient.get('/games/poker/open')
+  return response.data
+}
+
+export async function createPokerGame() {
+  const response = await apiClient.post('/games/poker')
+  return response.data
+}
+
+export async function fetchPokerGame(code) {
+  const response = await apiClient.get(`/games/poker/${code}`)
+  return response.data
+}
+
+export async function pokerLobbyAction(code, action) {
+  const response = await apiClient.post(`/games/poker/${code}/${action}`)
+  return response.data
+}
+
+export async function pokerNextHand(code, version) {
+  const response = await apiClient.post(`/games/poker/${code}/next`, { version })
+  return response.data
+}
+
+export async function sendPokerMove(code, move) {
+  const response = await apiClient.post(`/games/poker/${code}/move`, move)
+  return response.data
+}
+
 export async function fetchDurakGames() {
   const response = await apiClient.get('/games/durak')
   return response.data

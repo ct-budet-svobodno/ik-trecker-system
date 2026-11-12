@@ -14,6 +14,7 @@ from app.models.event_rsvp import EventRsvp
 from app.models.leadership_note import LeadershipNote
 from app.models.leadership_task import LeadershipTask, LeadershipTaskStatus
 from app.models.personal_todo import PersonalTodo
+from app.models.poker_game import PokerGame
 from app.models.push_subscription import PushSubscription
 from app.models.sea_battle_game import SeaBattleGame, SeaBattleStatus
 from app.models.survey import Survey, SurveyRecipient, SurveyResponse, SurveyStatus
@@ -44,6 +45,7 @@ __all__ = [
     "LeadershipTaskStatus",
     "LeadershipPosition",
     "PersonalTodo",
+    "PokerGame",
     "PushSubscription",
     "SeaBattleGame",
     "SeaBattleStatus",

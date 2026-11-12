@@ -16,6 +16,10 @@ import {
   fetchOpenBunkerTables,
   fetchDurakGames,
   fetchSeaGames,
+  createPokerGame,
+  fetchPokerGames,
+  fetchOpenPokerGames,
+  pokerLobbyAction,
 } from '../api/games'
 
 const router = useRouter()
@@ -24,6 +28,7 @@ const authStore = useAuthStore()
 const games = ref([])
 // Столы из админки, за которые можно сесть самому.
 const openTables = ref([])
+const openPoker = ref([])
 const isCreating = ref(false)
 const error = ref('')
 
@@ -32,6 +37,7 @@ const KINDS = {
   durak: { title: 'Дурак', route: 'durak', create: createDurakGame },
   sea: { title: 'Морской бой', route: 'sea', create: createSeaGame },
   bunker: { title: 'Бункер', route: 'bunker', create: createBunkerGame },
+  poker: { title: 'Покер', route: 'poker', create: createPokerGame },
 }
 
 // Картинка на плитке бункера: веер карт характеристик в цветах направлений.
@@ -58,16 +64,19 @@ const REFRESH_MS = 5000
 let refreshTimer = null
 
 async function refresh() {
-  const [durak, sea, bunker] = await Promise.all([
+  const [durak, sea, bunker, poker] = await Promise.all([
     fetchDurakGames().catch(() => []),
     fetchSeaGames().catch(() => []),
     fetchBunkerGames().catch(() => []),
+    fetchPokerGames().catch(() => []),
   ])
   fetchOpenBunkerTables().then((tables) => (openTables.value = tables)).catch(() => {})
+  fetchOpenPokerGames().then((tables) => (openPoker.value = tables)).catch(() => {})
   games.value = [
     ...durak.map((g) => ({ ...g, kind: 'durak' })),
     ...sea.map((g) => ({ ...g, kind: 'sea' })),
     ...bunker.map((g) => ({ ...g, kind: 'bunker' })),
+    ...poker.map((g) => ({ ...g, kind: 'poker' })),
   ].sort((a, b) => Number(b.my_turn) - Number(a.my_turn))
 }
 
@@ -105,11 +114,24 @@ async function joinTable(table) {
   }
 }
 
+async function joinPoker(table) {
+  isCreating.value = true
+  error.value = ''
+  try {
+    await pokerLobbyAction(table.code, 'join')
+    router.push({ name: 'poker', params: { code: table.code } })
+  } catch (err) {
+    error.value = err.response?.data?.detail ?? 'Не удалось сесть за стол'
+    isCreating.value = false
+  }
+}
+
 function openGame(game) {
   router.push({ name: KINDS[game.kind].route, params: { code: game.code } })
 }
 
 function gameName(game) {
+  if (game.kind === 'poker') return `Покер · ${game.players} игроков`
   if (game.kind === 'bunker') {
     return `${KINDS.bunker.title} · ${game.title ?? `игроков: ${game.players}`}`
   }
@@ -117,6 +139,7 @@ function gameName(game) {
 }
 
 function statusLabel(game) {
+  if (game.kind === 'poker') return game.status === 'waiting' ? 'Собираем стол' : game.my_turn ? 'Ваш ход' : 'Идёт игра'
   if (game.kind === 'bunker') {
     if (game.status === 'waiting') return game.my_turn ? 'Можно начинать' : 'Собираем лобби'
     return game.my_turn ? 'Ваш ход' : 'Идёт игра'
@@ -155,6 +178,39 @@ function statusLabel(game) {
             </div>
           </div>
         </section>
+
+        <section class="game-tile">
+          <div class="game-tile__art" aria-hidden="true">
+            <PlayingCard :card="12" size="table" class="game-tile__card game-tile__card--1" />
+            <PlayingCard :card="25" size="table" class="game-tile__card game-tile__card--2" />
+          </div>
+          <div class="game-tile__body">
+            <h2 class="game-tile__title">Покер</h2>
+            <p class="game-tile__desc">Техасский холдем на 2–6 человек. Соберите стол и пригласите игроков ссылкой. Фишки только игровые.</p>
+            <div class="game-tile__actions">
+              <button class="create-btn" :disabled="isCreating" @click="startGame('poker')">Собрать стол</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="game-tile">
+          <div class="game-tile__art" aria-hidden="true"><span style="font-size: 72px">🎭</span></div>
+          <div class="game-tile__body">
+            <h2 class="game-tile__title">Мафия · в Telegram-чате</h2>
+            <p class="game-tile__desc">Игра уже есть в боте. В группе напишите <strong>!мафия</strong> или <strong>/mafia</strong>, затем участники нажимают «Вступить». Нужно 5–16 человек. Роли и ночные действия бот пришлёт в личку.</p>
+          </div>
+        </section>
+
+        <div v-if="openPoker.length" class="tables">
+          <p class="tables__title">Открытые столы покера</p>
+          <div v-for="table in openPoker" :key="table.code" class="tables__item">
+            <span class="tables__info">
+              <span class="tables__name">Стол {{ table.code }}</span>
+              <span class="tables__meta">{{ table.players }} из 6 · создал {{ table.host_name }}</span>
+            </span>
+            <button class="game-tile__secondary" :disabled="isCreating" @click="joinPoker(table)">Сесть</button>
+          </div>
+        </div>
 
         <section class="game-tile">
           <div class="game-tile__art game-tile__art--sea" aria-hidden="true">
