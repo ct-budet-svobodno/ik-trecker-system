@@ -51,7 +51,7 @@ _LOGO_DATA = b64encode(Path(__file__).with_name("ik_logo_widget.png").read_bytes
 
 _STYLE = """<style>
 *{box-sizing:border-box}body{margin:0;background:#131019;color:#f1f0f5;font:14px/1.5 'Golos Text',system-ui,'Segoe UI',sans-serif}
-.card{padding:18px;border:1px solid #3d3b50;border-radius:18px;background:radial-gradient(65% 85% at -5% 55%,rgba(201,51,54,.55) 0%,transparent 60%),radial-gradient(62% 68% at 42% 108%,rgba(232,134,60,.52) 0%,transparent 60%),radial-gradient(65% 90% at 105% 60%,rgba(38,176,150,.50) 0%,transparent 62%),#131019}
+.card{padding:18px;border:1px solid #3d3b50;border-radius:0px;background:radial-gradient(65% 85% at -5% 55%,rgba(201,51,54,.55) 0%,transparent 60%),radial-gradient(62% 68% at 42% 108%,rgba(232,134,60,.52) 0%,transparent 60%),radial-gradient(65% 90% at 105% 60%,rgba(38,176,150,.50) 0%,transparent 62%),#131019}
 .top{display:flex;align-items:center;justify-content:space-between;gap:8px}.mark{display:flex;align-items:center;gap:9px;font-weight:900;letter-spacing:.06em}
 .ik{display:block;width:64px;height:51px;flex:none;object-fit:contain}
 .eyebrow{color:#a6a1b4;font:500 10px/1.4 'JetBrains Mono',ui-monospace,monospace;letter-spacing:.08em}.date{color:#a6a1b4;font:11px 'JetBrains Mono',ui-monospace,monospace}
