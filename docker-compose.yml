@@ -45,9 +45,12 @@ services:
     restart: unless-stopped
     env_file:
       - ${BOT_ENV_FILE:-./bot/.env}
+    environment:
+      TRACKER_DB_PATH: /tracker-data/ik_tracker.db
     volumes:
       - ${BOT_DATA_DIR:-./bot/database}:/app/database
       - ${BOT_WHISPER_CACHE_DIR:-./bot/whisper-cache}:/app/whisper-cache
+      - backend_data:/tracker-data:ro
 
   frontend:
     build: ./frontend

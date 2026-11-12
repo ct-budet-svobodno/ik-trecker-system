@@ -17,14 +17,19 @@
 import logging
 import os
 import re
+import asyncio
+import sqlite3
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import BaseFilter
 from aiogram.types import (
-    InlineKeyboardButton, InlineKeyboardMarkup, MenuButtonWebApp, Message, WebAppInfo,
+    BotCommand, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, MenuButtonWebApp, Message, WebAppInfo,
 )
 
 from utils.format import DIVIDER
+from utils.my_tasks import load_my_tasks, my_tasks_caption, render_my_tasks_widget
+from utils.valyny_widget import SendWidget
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +156,10 @@ def tracker_button() -> InlineKeyboardButton:
 
 
 def tracker_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[tracker_button()]])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Мои задачи", callback_data="tracker:my_tasks")],
+        [tracker_button()],
+    ])
 
 
 async def setup_menu_button(bot: Bot) -> None:
@@ -160,6 +168,11 @@ async def setup_menu_button(bot: Bot) -> None:
         await bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(text="Трекер", web_app=WebAppInfo(url=TRACKER_URL))
         )
+        await bot.set_my_commands([
+            BotCommand(command="start", description="Главное меню"),
+            BotCommand(command="tasks", description="Мои задачи"),
+            BotCommand(command="tracker", description="Открыть трекер"),
+        ])
     except Exception as exc:
         logger.warning("Не удалось поставить кнопку трекера в меню: %s", exc)
 
@@ -188,3 +201,39 @@ async def tracker_group(message: Message):
         f'Трекер открывается в личке, <a href="{link}">жми сюда</a>.',
         parse_mode="HTML", disable_web_page_preview=True,
     )
+
+
+async def _send_my_tasks(bot: Bot, chat_id: int) -> None:
+    try:
+        name, tasks = await asyncio.to_thread(load_my_tasks, chat_id)
+    except (sqlite3.Error, OSError) as exc:
+        logger.exception("Не удалось прочитать задачи трекера: %s", exc)
+        await bot.send_message(chat_id, "Сейчас не удалось загрузить задачи. Попробуй позже.",
+                               reply_markup=tracker_kb())
+        return
+    if name is None:
+        await bot.send_message(
+            chat_id, "Твой Telegram пока не привязан к аккаунту трекера. Открой трекер и подключи Telegram в профиле.",
+            reply_markup=tracker_kb(),
+        )
+        return
+    caption = my_tasks_caption(tasks)
+    try:
+        widget = render_my_tasks_widget(name, tasks)
+        await bot(SendWidget(chat_id=chat_id, html=widget, width=360, height=0, caption=caption))
+    except (TelegramAPIError, ValueError) as exc:
+        logger.warning("My tasks widget unavailable: %s: %s", type(exc).__name__, str(exc)[:200])
+        await bot.send_message(chat_id, caption, reply_markup=tracker_kb())
+
+
+@tracker_router.callback_query(F.data == "tracker:my_tasks")
+async def my_tasks_button(query: CallbackQuery):
+    await query.answer()
+    if query.message and query.message.chat.type == "private" and query.from_user:
+        await _send_my_tasks(query.bot, query.from_user.id)
+
+
+@tracker_router.message(F.chat.type == "private", Exact("!мои задачи", "/tasks", "/mytasks"))
+async def my_tasks_command(message: Message):
+    if message.from_user:
+        await _send_my_tasks(message.bot, message.from_user.id)
