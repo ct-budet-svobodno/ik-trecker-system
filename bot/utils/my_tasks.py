@@ -45,24 +45,26 @@ def load_my_tasks(telegram_id: int) -> tuple[str | None, list[MyTask]]:
 
 
 _STYLE = """<style>
-*{box-sizing:border-box}body{margin:0;background:#131019;color:#f1f0f5;font:14px/1.3 system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:#131019;color:#f1f0f5;font:14px/1.5 'Golos Text',system-ui,'Segoe UI',sans-serif}
 .card{padding:18px;border:1px solid #3d3b50;border-radius:18px;background:linear-gradient(145deg,#232230,#131019 60%,#1b1a24)}
 .top{display:flex;align-items:center;justify-content:space-between;gap:8px}.mark{display:flex;align-items:center;gap:9px;font-weight:900;letter-spacing:.06em}
 .ik{display:grid;place-items:center;width:37px;height:37px;border-radius:11px;background:#8b5cf6;color:white;font-size:18px}
-.eyebrow{color:#a6a1b4;font-size:10px;font-weight:800;letter-spacing:.13em}.date{color:#a6a1b4;font-size:11px}
+.eyebrow{color:#a6a1b4;font:500 10px/1.4 'JetBrains Mono',ui-monospace,monospace;letter-spacing:.08em}.date{color:#a6a1b4;font:11px 'JetBrains Mono',ui-monospace,monospace}
 .rule{height:3px;margin:15px 0;background:linear-gradient(90deg,#cb77ab,#ff9934,#2dd4bf);border-radius:4px}
-h1{margin:0 0 3px;font-size:23px;letter-spacing:-.03em}.sub{margin:0 0 14px;color:#a6a1b4;font-size:12px}
-.stats{display:flex;gap:7px;margin-bottom:13px}.stat{flex:1;padding:8px;border:1px solid #353244;border-radius:10px;background:#1b1a24;text-align:center}
-.stat b{display:block;font-size:18px;color:#c4a9ff}.stat small{font-size:10px;color:#a6a1b4}
+h1{margin:0 0 3px;font:500 21px/1.3 'Unbounded','Golos Text',system-ui,sans-serif;letter-spacing:-.01em}.sub{margin:0 0 14px;color:#a6a1b4;font-size:12px}
+.stats{display:flex;gap:7px;margin-bottom:13px}.stat{flex:1;padding:8px;border:1px solid #302e3f;border-radius:12px;background:#1b1a24;text-align:center}
+.stat b{display:block;font:500 18px 'JetBrains Mono',ui-monospace,monospace;color:#8b5cf6}.stat.progress b{color:#e0a85e}.stat.done-count b{color:#45c4a0}.stat small{font-size:10px;color:#a6a1b4}
 .nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:11px}
-.nav button{padding:8px 10px;border:1px solid #8b5cf6;border-radius:9px;background:#302448;color:#f1f0f5;font:700 12px system-ui,sans-serif}
-.nav button:disabled{border-color:#302e3f;background:#1b1a24;color:#726e82}.nav span{color:#a6a1b4;font-size:12px;font-weight:700}
-.page{display:none;gap:7px}.page.active{display:grid}.task{padding:10px;border:1px solid #353244;border-radius:11px;background:#1b1a24}
-.task.overdue{border-color:#a94f62}.task.done{opacity:.67}.title{font-weight:750;overflow-wrap:anywhere}
-.meta{display:flex;justify-content:space-between;gap:6px;margin-top:6px;color:#aaa5b8;font-size:11px}
-.status{color:#c4a9ff}.overdue .due{color:#ff8794}.done .status{color:#2dd4bf}
-.empty{padding:22px 12px;border:1px solid #353244;border-radius:11px;background:#1b1a24;text-align:center;color:#a6a1b4}
-.foot{margin-top:13px;color:#a6a1b4;font-size:10px;font-weight:700;letter-spacing:.04em}
+.nav button{padding:8px 10px;border:1px solid #8b5cf6;border-radius:8px;background:#302448;color:#f1f0f5;font:600 12px 'Golos Text',system-ui,sans-serif}
+.nav button:disabled{border-color:#302e3f;background:#1b1a24;color:#726e82}.nav span{color:#a6a1b4;font:500 12px 'JetBrains Mono',ui-monospace,monospace}
+.page{display:none;gap:8px}.page.active{display:grid}.task{position:relative;overflow:hidden;padding:10px 11px 10px 14px;border:1px solid #302e3f;border-radius:12px;background:#1b1a24}
+.task:before{content:'';position:absolute;inset:0 auto 0 0;width:4px;background:#8b5cf6}.task.overdue{border-color:#f87171}.task.done .title{color:#a6a1b4;text-decoration:line-through;text-decoration-color:#726e82}
+.task-head{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px}.kind{padding:2px 6px;border-radius:6px;background:#302448;color:#f1f0f5;font-size:10px;font-weight:600}
+.status{display:inline-flex;align-items:center;gap:5px;color:#a6a1b4;font-size:10px;white-space:nowrap}.dot{width:7px;height:7px;border-radius:50%;background:#908ca0}
+.status.in_progress .dot{background:#e0a85e}.status.in_review .dot{background:#a78bfa}.status.done .dot{background:#45c4a0}
+.title{font-size:14px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}.due{margin-top:5px;color:#a6a1b4;font:11px 'JetBrains Mono',ui-monospace,monospace}
+.overdue .due{color:#f87171}.empty{padding:22px 12px;border:1px solid #302e3f;border-radius:12px;background:#1b1a24;text-align:center;color:#a6a1b4}
+.foot{margin-top:13px;color:#a6a1b4;font:500 10px/1.4 'JetBrains Mono',ui-monospace,monospace;letter-spacing:.04em}
 </style>"""
 
 _SCRIPT = """<script>(function(){var p=document.querySelectorAll('.page'),i=0,a=document.getElementById('prev'),b=document.getElementById('next'),c=document.getElementById('counter');function show(n){p[i].classList.remove('active');i=n;p[i].classList.add('active');a.disabled=i===0;b.disabled=i===p.length-1;c.textContent=(i+1)+' / '+p.length}a.onclick=function(){if(i>0)show(i-1)};b.onclick=function(){if(i<p.length-1)show(i+1)}})();</script>"""
@@ -81,12 +83,14 @@ def render_my_tasks_widget(name: str, tasks: list[MyTask], today: date | None = 
         due = task.due_date[8:10] + "." + task.due_date[5:7] if task.due_date else "Без срока"
         if overdue:
             due = "Просрочено · " + due
-        kind = "Чеклист · " if task.is_checklist else ""
+        kind = "Чек-лист" if task.is_checklist else "Задача"
+        status = task.status if task.status in _STATUS else "todo"
         cards.append(
             f'<div class="task{" overdue" if overdue else ""}{" done" if task.status == "done" else ""}">'
+            f'<div class="task-head"><span class="kind">{kind}</span>'
+            f'<span class="status {status}"><span class="dot"></span>{_STATUS[status]}</span></div>'
             f'<div class="title">{html.escape(task.title[:160], quote=True)}</div>'
-            f'<div class="meta"><span class="status">{kind}{_STATUS.get(task.status, "Не начато")}</span>'
-            f'<span class="due">{due}</span></div></div>'
+            f'<div class="due">{due}</div></div>'
         )
     pages = [cards[i:i + 5] for i in range(0, len(cards), 5)] or [[
         '<div class="empty">Пока нет назначенных задач ✨</div>'
@@ -108,8 +112,8 @@ def render_my_tasks_widget(name: str, tasks: list[MyTask], today: date | None = 
         + '<h1>Мои задачи</h1>'
         + f'<p class="sub">{first_name}, вот что тебе назначено</p>'
         + f'<div class="stats"><div class="stat"><b>{active}</b><small>Активные</small></div>'
-        + f'<div class="stat"><b>{progress}</b><small>В работе</small></div>'
-        + f'<div class="stat"><b>{done}</b><small>Сделано</small></div></div>'
+        + f'<div class="stat progress"><b>{progress}</b><small>В работе</small></div>'
+        + f'<div class="stat done-count"><b>{done}</b><small>Сделано</small></div></div>'
         + nav + page_html + '<div class="foot">АКТУАЛЬНО НА МОМЕНТ ЗАПРОСА · ОТКРОЙ ТРЕКЕР ДЛЯ ДЕЙСТВИЙ</div>'
         + '</div>' + (_SCRIPT if len(pages) > 1 else "") + '</html>'
     )
