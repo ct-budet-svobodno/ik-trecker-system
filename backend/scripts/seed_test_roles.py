@@ -79,7 +79,6 @@ def main() -> None:
                 user_repository.update(
                     db, user,
                     is_activist=True,
-                    can_issue_checklists=username == "t.activist",
                 )
             print(f"{'создан' if is_new else 'есть   '} {username}")
 

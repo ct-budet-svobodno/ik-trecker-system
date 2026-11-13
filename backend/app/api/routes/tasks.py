@@ -37,7 +37,7 @@ def create_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TaskOut:
-    if current_user.role == UserRole.EMPLOYEE and not (current_user.is_activist and current_user.can_issue_checklists and task_create.is_checklist):
+    if current_user.role == UserRole.EMPLOYEE and not task_create.is_checklist:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
     try:
         task = task_service.create_task(db, task_create, created_by=current_user)

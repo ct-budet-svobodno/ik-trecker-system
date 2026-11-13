@@ -5,6 +5,11 @@ export async function fetchUsers() {
   return response.data
 }
 
+export async function fetchChecklistAssignees() {
+  const response = await apiClient.get('/users/checklist-assignees')
+  return response.data
+}
+
 export async function createUser(payload) {
   const response = await apiClient.post('/users', payload)
   return response.data

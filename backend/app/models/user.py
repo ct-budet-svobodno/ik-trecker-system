@@ -52,7 +52,6 @@ class User(Base):
     # В активе ИК (галочка в «Пользователях»). Ставится сам, когда человек
     # заполнил анкету — в мини-аппе или в боте.
     is_activist: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    can_issue_checklists: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Направления, в которых человек состоит (может быть несколько; не путать
     # с руководством — direction_heads). Из анкеты, правит админ.
     directions: Mapped[list["Direction"]] = relationship(  # noqa: F821

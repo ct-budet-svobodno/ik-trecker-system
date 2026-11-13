@@ -9,18 +9,18 @@ def _headers(client, credentials):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_selected_activist_assigns_checklist_to_any_user(client, admin_credentials, employee_credentials, manager_credentials):
-    admin = _headers(client, admin_credentials)
+def test_any_user_assigns_checklist_to_any_other_user(client, employee_credentials, manager_credentials):
     issuer = _headers(client, employee_credentials)
     assignee = _headers(client, manager_credentials)
     assignee_id = client.get("/api/auth/me", headers=assignee).json()["id"]
     payload = {"title": "Подготовить афишу", "is_checklist": True, "assignee_id": assignee_id, "due_date": "2026-12-01"}
 
-    assert client.post("/api/tasks", json=payload, headers=issuer).status_code == 403
     issuer_id = client.get("/api/auth/me", headers=issuer).json()["id"]
-    updated = client.patch(f"/api/users/{issuer_id}", json={"is_activist": True, "can_issue_checklists": True}, headers=admin)
-    assert updated.status_code == 200
-    assert updated.json()["can_issue_checklists"] is True
+    assert client.get("/api/users", headers=issuer).status_code == 403
+    people = client.get("/api/users/checklist-assignees", headers=issuer).json()
+    assert {person["id"] for person in people} == {issuer_id, assignee_id}
+    assert all(set(person) == {"id", "full_name", "is_active"} for person in people)
+    assert client.post("/api/tasks", json={"title": "Обычное ТЗ", "direction_id": 1}, headers=issuer).status_code == 403
 
     self_assignment = client.post("/api/tasks", json={**payload, "assignee_id": issuer_id}, headers=issuer)
     assert self_assignment.status_code == 400

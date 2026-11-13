@@ -157,7 +157,7 @@ const dragOverStatus = ref(null)
 const dragError = ref('')
 
 const canCreateTask = computed(() => ['admin', 'manager'].includes(authStore.user?.role))
-const canCreateChecklist = computed(() => authStore.isAdmin || (authStore.user?.is_activist && authStore.user?.can_issue_checklists))
+const canCreateChecklist = computed(() => Boolean(authStore.user))
 
 onMounted(async () => {
   await tasksStore.loadAll()

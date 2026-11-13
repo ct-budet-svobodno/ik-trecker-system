@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 
-import { fetchUsers } from '../api/users'
+import { fetchChecklistAssignees, fetchUsers } from '../api/users'
 import { createTask } from '../api/tasks'
 import BaseIcon from './BaseIcon.vue'
 import { LEADERSHIP_POSITION_LABELS, ROLE_LABELS } from '../constants/roleLabels'
@@ -113,7 +113,10 @@ const submitLabel = computed(() => {
 
 onMounted(async () => {
   try {
-    users.value = await fetchUsers()
+    users.value = authStore.user?.role === 'employee' ? await fetchChecklistAssignees() : await fetchUsers()
+    if (isChecklist.value && props.task?.assignee && !users.value.some((user) => user.id === props.task.assignee.id)) {
+      users.value.push({ ...props.task.assignee, is_active: false })
+    }
   } catch {
     users.value = []
   }

@@ -7,7 +7,7 @@ from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.repositories import user_repository
 from app.models.user import RegistrationStatus
-from app.schemas.user import BotImportOut, RegistrationOut, UserCreate, UserOut, UserProfileOut, UserUpdate
+from app.schemas.user import BotImportOut, ChecklistAssigneeOut, RegistrationOut, UserCreate, UserOut, UserProfileOut, UserUpdate
 from app.services import bot_import_service, editorial_service, registration_service, user_service
 from app.services.exceptions import RegistrationError, UsernameTakenError
 
@@ -38,13 +38,21 @@ def create_user(user_create: UserCreate, db: Session = Depends(get_db)) -> User:
     response_model=list[UserOut],
 )
 def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[User]:
-    if current_user.role == UserRole.EMPLOYEE and not (current_user.is_activist and current_user.can_issue_checklists):
+    if current_user.role == UserRole.EMPLOYEE:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
     # Заявки из мини-аппа (ещё не одобренные) сюда не попадают — они в /registrations.
     return [
         _with_reviewer_flag(db, user)
         for user in user_service.list_users(db)
         if user.registration_status == RegistrationStatus.APPROVED
+    ]
+
+
+@router.get("/checklist-assignees", response_model=list[ChecklistAssigneeOut])
+def list_checklist_assignees(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[User]:
+    return [
+        user for user in user_service.list_users(db)
+        if user.is_active and user.registration_status == RegistrationStatus.APPROVED
     ]
 
 
@@ -166,6 +174,5 @@ def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get
         is_editorial=user_update.is_editorial,
         is_zavod=user_update.is_zavod,
         is_activist=user_update.is_activist,
-        can_issue_checklists=user_update.can_issue_checklists,
     )
     return _with_reviewer_flag(db, user)

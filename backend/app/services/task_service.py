@@ -131,8 +131,6 @@ def _check_users(db: Session, user_ids: list[int]) -> None:
 
 def create_task(db: Session, task_create: TaskCreate, created_by: User) -> Task:
     if task_create.is_checklist:
-        if not (created_by.role == UserRole.ADMIN or (created_by.is_activist and created_by.can_issue_checklists)):
-            raise TaskAccessError("Нет права выдавать чек-листы")
         if task_create.assignee_id == created_by.id:
             raise TaskAssigneeError("Назначьте чек-лист другому человеку")
     elif task_create.is_private and not can_assign_private(created_by):
