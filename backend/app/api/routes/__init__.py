@@ -16,6 +16,7 @@ from app.api.routes import (
     tasks,
     users,
     zavod,
+    welcome_book,
 )
 
 api_router = APIRouter()
@@ -42,3 +43,4 @@ api_router.include_router(games.router, prefix="/games", tags=["games"])
 api_router.include_router(broadcasts.router, prefix="/broadcasts", tags=["broadcasts"])
 api_router.include_router(checklists.router, prefix="/checklists", tags=["checklists"])
 api_router.include_router(surveys.router, prefix="/surveys", tags=["surveys"])
+api_router.include_router(welcome_book.router, prefix="/welcome-book", tags=["welcome-book"])

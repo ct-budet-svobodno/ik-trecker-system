@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     profile_photos_dir: str = "data/profile_photos"
     # Картинки чек-листов «Найди того, кто…» (рисует админка, рассылает бот).
     checklist_images_dir: str = "data/checklists"
+    # Общий велкомбук; в Docker хранится в томе с базой и переживает пересборку.
+    welcome_book_dir: str = "data/welcome_book"
     # Как часто подтягивать анкеты из базы бота в трекер (0 — только вручную).
     bot_import_interval_minutes: int = 10
     # База бота flood (SQLite): одобренная анкета из мини-аппа дописывается туда,

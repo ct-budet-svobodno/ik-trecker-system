@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY alembic.ini .
 COPY alembic ./alembic
 COPY app ./app
+COPY assets ./assets
 COPY scripts ./scripts
 
 # Каталог под SQLite (маунтится docker-томом, см. docker-compose.yml)

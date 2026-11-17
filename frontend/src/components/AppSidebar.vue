@@ -145,6 +145,14 @@ function handleLogout() {
       <div class="nav-section__label">Общее</div>
       <button
         class="nav-item"
+        :class="{ 'nav-item--active': route.name === 'welcome-book' }"
+        @click="router.push({ name: 'welcome-book' })"
+      >
+        <span class="nav-item__dot nav-item__dot--all" />
+        <span class="nav-item__name">Welcome Book</span>
+      </button>
+      <button
+        class="nav-item"
         :class="{ 'nav-item--active': route.name === 'home' }"
         @click="goToHome"
       >

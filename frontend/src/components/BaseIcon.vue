@@ -49,6 +49,10 @@ defineProps({
       <path d="M9.5 20.5v-6h5v6" />
     </template>
 
+    <template v-else-if="name === 'expand'">
+      <path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4" />
+    </template>
+
     <!-- Поиск -->
     <template v-else-if="name === 'search'">
       <circle cx="11" cy="11" r="6.25" />

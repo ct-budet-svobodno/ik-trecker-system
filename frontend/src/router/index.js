@@ -5,6 +5,12 @@ import { isTelegram } from '../utils/telegram'
 
 const routes = [
   {
+    path: '/welcome-book',
+    name: 'welcome-book',
+    component: () => import('../views/WelcomeBookView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('../views/LoginView.vue'),

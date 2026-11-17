@@ -194,6 +194,15 @@ function plural(n, one, few, many) {
         </button>
 
         <div class="grid">
+          <section class="panel welcome-panel">
+            <div class="panel__head">
+              <h2 class="panel__title">Welcome Book</h2>
+              <button class="panel__link" @click="router.push({ name: 'welcome-book' })">
+                Читать <BaseIcon name="chevron-right" :size="14" />
+              </button>
+            </div>
+            <p class="empty">Твой путеводитель по Информационному комитету. Знакомься с командой и листай нашу историю как журнал.</p>
+          </section>
           <!-- Мероприятия -->
           <section class="panel">
             <div class="panel__head">
@@ -346,6 +355,11 @@ function plural(n, one, few, many) {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+.welcome-panel {
+  grid-column: 1 / -1;
+  background: linear-gradient(110deg, var(--accent-soft), transparent), var(--surface);
 }
 
 .home header {

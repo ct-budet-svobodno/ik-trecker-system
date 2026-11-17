@@ -33,7 +33,7 @@ const isEditorialActive = computed(
 )
 // «Ещё» активна, когда открыт раздел из шторки.
 const isMoreActive = computed(() =>
-  ['calendar', 'leadership-timeline', 'zavod', 'users', 'broadcast', 'checklists', 'games', 'durak'].includes(route.name) ||
+  ['welcome-book', 'calendar', 'leadership-timeline', 'zavod', 'users', 'broadcast', 'checklists', 'games', 'durak'].includes(route.name) ||
     route.name?.startsWith('survey'),
 )
 
@@ -101,6 +101,7 @@ function handleLogout() {
         <span class="sheet__grip" />
 
         <div class="sheet__section">
+          <button class="sheet-item" @click="go('welcome-book')">Welcome Book</button>
           <button class="sheet-item" @click="go('calendar')">Календарь</button>
           <button class="sheet-item" @click="go('tasks', { all: '1' })">Все ТЗ</button>
           <button
