@@ -15,10 +15,14 @@ const raiseTo = ref(40)
 const code = computed(() => String(route.params.code).toUpperCase())
 const me = computed(() => game.value?.players?.[game.value.seat] ?? null)
 const isTurn = computed(() => game.value?.turn === game.value?.seat && game.value?.status === 'playing')
-const minRaiseTo = computed(() => (game.value?.current_bet ?? 0) + (game.value?.min_raise ?? 20))
-const canRaise = computed(() => me.value && me.value.stack + me.value.bet >= minRaiseTo.value)
+const minRaiseTo = computed(() => game.value?.min_raise_to ?? 20)
+const canRaise = computed(() => game.value?.can_raise && me.value && me.value.stack + me.value.bet >= minRaiseTo.value)
 const phaseNames = { preflop: 'Префлоп', flop: 'Флоп', turn: 'Тёрн', river: 'Ривер', showdown: 'Вскрытие' }
+const now = ref(Date.now())
+const secondsLeft = computed(() => Math.max(0, Math.ceil(((game.value?.turn_deadline ?? 0) * 1000 - now.value) / 1000)))
+const combinations = ['Старшая карта', 'Пара', 'Две пары', 'Тройка', 'Стрит', 'Флеш', 'Фулл-хаус', 'Каре', 'Стрит-флеш']
 let timer = null
+let clock = null
 
 async function load() {
   try {
@@ -29,9 +33,10 @@ async function load() {
       return
     }
     const fresh = await fetchPokerGame(code.value)
+    if (code.value !== fresh.code || (game.value?.code === fresh.code && game.value.version > fresh.version)) return
     game.value = fresh
-    if (!raiseTo.value || raiseTo.value < fresh.current_bet + fresh.min_raise) {
-      raiseTo.value = fresh.current_bet + fresh.min_raise
+    if (!raiseTo.value || raiseTo.value < fresh.min_raise_to) {
+      raiseTo.value = fresh.min_raise_to
     }
     error.value = ''
   } catch (err) {
@@ -46,7 +51,9 @@ async function act(request) {
     game.value = await request()
   } catch (err) {
     error.value = err.response?.data?.detail ?? 'Действие не выполнено'
+    const actionError = error.value
     await load()
+    error.value = actionError
   } finally {
     busy.value = false
   }
@@ -77,10 +84,11 @@ async function copyInvite() {
 const copied = ref(false)
 onMounted(() => {
   load()
+  clock = setInterval(() => { now.value = Date.now() }, 1000)
   timer = setInterval(() => { if (!document.hidden && code.value !== 'NEW' && !busy.value) load() }, 2000)
 })
 watch(code, load)
-onBeforeUnmount(() => clearInterval(timer))
+onBeforeUnmount(() => { clearInterval(timer); clearInterval(clock) })
 </script>
 
 <template>
@@ -110,7 +118,7 @@ onBeforeUnmount(() => clearInterval(timer))
             </div>
           </div>
 
-          <template v-else-if="game.status === 'playing'">
+          <template v-else-if="game.status === 'playing' || game.status === 'finished'">
             <div class="table">
               <div class="table-head"><strong>{{ phaseNames[game.phase] }}</strong><span>Банк: {{ game.pot }}</span></div>
               <div class="board">
@@ -132,25 +140,27 @@ onBeforeUnmount(() => clearInterval(timer))
               <h2>Раздача завершена</h2>
               <p v-for="(amount, seat) in game.result?.payouts" :key="seat">
                 {{ game.players[Number(seat)]?.name }} получает {{ amount }} фишек
+                <span v-if="game.result?.scores?.[seat]"> · {{ combinations[game.result.scores[seat][0]] }}</span>
               </p>
               <button v-if="game.is_host && game.can_continue" :disabled="busy" @click="act(() => pokerNextHand(code, game.version))">Следующая раздача</button>
               <p v-else-if="!game.can_continue">Победитель: {{ game.players.find((player) => player.stack > 0)?.name }}</p>
             </div>
             <div v-else-if="isTurn" class="panel">
-              <h2>Ваш ход</h2>
+              <h2>Ваш ход · {{ secondsLeft }} с</h2>
+              <p class="hint">Через 60 секунд автоматически: чек, если ставка уравнена, иначе пас.</p>
               <p>Уравнять: {{ Math.min(game.to_call, me.stack) }} · фишек: {{ me.stack }}</p>
               <div class="actions">
                 <button class="secondary" :disabled="busy" @click="move('fold')">Пас</button>
                 <button :disabled="busy" @click="move(game.to_call ? 'call' : 'check')">{{ game.to_call ? 'Уравнять' : 'Чек' }}</button>
-                <button class="secondary" :disabled="busy || !me.stack" @click="move('all_in')">Олл-ин</button>
+                <button class="secondary" :disabled="busy || !me.stack || (!game.can_raise && me.stack + me.bet > game.current_bet)" @click="move('all_in')">Олл-ин</button>
               </div>
               <div v-if="canRaise" class="actions raise">
                 <label>Повысить до <input v-model.number="raiseTo" type="number" :min="minRaiseTo" :max="me.stack + me.bet" step="10" /></label>
                 <button :disabled="busy || raiseTo < minRaiseTo || raiseTo > me.stack + me.bet" @click="move('raise')">Повысить</button>
               </div>
             </div>
-            <p v-else-if="game.phase !== 'showdown'" class="hint">Ходит {{ game.players[game.turn]?.name ?? 'другой игрок' }}</p>
-            <button v-if="game.is_host" class="secondary stop" :disabled="busy" @click="lobby('stop')">Закрыть стол</button>
+            <p v-else-if="game.phase !== 'showdown'" class="hint">Ходит {{ game.players[game.turn]?.name ?? 'другой игрок' }} · {{ secondsLeft }} с</p>
+            <button v-if="game.is_host && game.status === 'playing'" class="secondary stop" :disabled="busy" @click="lobby('stop')">Закрыть стол</button>
           </template>
           <div v-else class="panel"><h2>Стол закрыт</h2></div>
 

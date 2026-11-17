@@ -56,9 +56,11 @@ TRACKER_TEXT = "\n".join([
 
 # Приглашение в партию: код из трекера (app/services/durak_service.py,
 # sea_battle_service.py, bunker_service.py). Пейлоад → (путь в трекере, текст, кнопка, о партии).
-GAME_PAYLOAD = re.compile(r"^(durak|sea|bunker)_([A-Za-z0-9]{4,16})$")
+GAME_PAYLOAD = re.compile(r"^(durak|sea|bunker|poker)_([A-Za-z0-9]{4,16})$")
 
 GAME_INVITES = {
+    "poker": ("poker", "🃏 <b>Тебя зовут в покер</b>", "🃏 Сесть за стол",
+              "Техасский холдем на 2–6 человек с игровыми фишками. Жми кнопку — откроется лобби."),
     "durak": ("durak", "🃏 <b>Тебя зовут в дурака</b>", "🃏 Сесть за стол", None),
     "sea": ("sea", "🚢 <b>Тебя зовут в морской бой</b>", "🚢 Сесть за стол", None),
     "bunker": (

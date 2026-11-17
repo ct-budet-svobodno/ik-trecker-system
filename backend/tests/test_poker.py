@@ -94,3 +94,74 @@ def test_api_lobby_privacy_and_turn(client):
     assert client.post(f'/api/games/poker/{code}/move', headers=host, json={
         'action': 'fold', 'version': started['version']
     }).status_code == 409
+
+
+def test_timeout_auto_fold_and_check(client, monkeypatch):
+    from app.services import poker_service
+    from app.models.poker_game import PokerGame
+    from sqlalchemy import select
+
+    host, guest = players(client, 2)
+    code = client.post('/api/games/poker', headers=host).json()['code']
+    client.post(f'/api/games/poker/{code}/join', headers=guest)
+    started = client.post(f'/api/games/poker/{code}/start', headers=host).json()
+    with TestingSessionLocal() as db:
+        poker_service.expire_turns(db)
+        assert db.scalar(select(PokerGame)).version == started['version']
+    monkeypatch.setattr(poker_service.time, 'time', lambda: started['turn_deadline'] + 1)
+    with TestingSessionLocal() as db:
+        poker_service.expire_turns(db)
+    after = client.get(f'/api/games/poker/{code}', headers=host).json()
+    assert after['phase'] == 'showdown'
+    assert after['players'][0]['folded']
+    assert after['turn_deadline'] is None
+    fresh = client.post(f'/api/games/poker/{code}/next', headers=host, json={'version': after['version']}).json()
+    # Guest is now the small blind. Calling gives the big blind a free check.
+    called = client.post(f'/api/games/poker/{code}/move', headers=guest, json={
+        'version': fresh['version'], 'action': 'call'
+    }).json()
+    monkeypatch.setattr(poker_service.time, 'time', lambda: called['turn_deadline'] + 1)
+    with TestingSessionLocal() as db:
+        poker_service.expire_turns(db)
+    after = client.get(f'/api/games/poker/{code}', headers=host).json()
+    assert after['phase'] == 'flop'
+    assert not after['players'][0]['folded']
+
+
+def test_finished_table_is_removed_from_active_list(client):
+    from app.services import poker_service
+    from app.models.poker_game import PokerGame
+    from sqlalchemy import select
+
+    host, guest = players(client, 2)
+    code = client.post('/api/games/poker', headers=host).json()['code']
+    client.post(f'/api/games/poker/{code}/join', headers=guest)
+    client.post(f'/api/games/poker/{code}/start', headers=host)
+    with TestingSessionLocal() as db:
+        game = db.scalar(select(PokerGame))
+        state = {'players': [dict(id=p['id'], name=p['name'], stack=2000 if i == 0 else 0)
+                             for i, p in enumerate(game.state['players'])],
+                 'phase': 'showdown', 'turn': None}
+        poker_service._save(db, game, state)
+    assert client.get('/api/games/poker', headers=host).json() == []
+    assert client.get(f'/api/games/poker/{code}', headers=host).json()['status'] == 'finished'
+
+
+def test_telegram_invite(client, monkeypatch):
+    from app.services import telegram_service
+    monkeypatch.setattr(telegram_service, 'startapp_url', lambda param: f'https://t.me/test?startapp={param}')
+    host, = players(client, 1)
+    game = client.post('/api/games/poker', headers=host).json()
+    assert game['invite_url'] == f'https://t.me/test?startapp=poker_{game["code"]}'
+
+
+def test_fold_win_does_not_reveal_opponent_cards(client):
+    host, guest = players(client, 2)
+    code = client.post('/api/games/poker', headers=host).json()['code']
+    client.post(f'/api/games/poker/{code}/join', headers=guest)
+    started = client.post(f'/api/games/poker/{code}/start', headers=host).json()
+    ended = client.post(f'/api/games/poker/{code}/move', headers=host, json={
+        'version': started['version'], 'action': 'fold'
+    }).json()
+    assert ended['phase'] == 'showdown'
+    assert ended['players'][1]['cards'] == [None, None]

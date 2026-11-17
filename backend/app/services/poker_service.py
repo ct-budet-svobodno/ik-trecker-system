@@ -2,6 +2,7 @@
 
 import copy
 import secrets
+import time
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from app.core.config import settings
 from app.games import poker
 from app.models.poker_game import PokerGame
 from app.models.user import User
+from app.services import telegram_service
 
 ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 
@@ -31,6 +33,25 @@ def _get(db: Session, code: str) -> PokerGame:
     if game is None:
         raise PokerNotFoundError('Стол не найден')
     return game
+
+
+def expire_turns(db: Session) -> None:
+    games = db.scalars(select(PokerGame).where(PokerGame.status == 'playing')).all()
+    for game in games:
+        deadline = game.state.get('turn_deadline')
+        if game.state.get('turn') is None or (deadline is not None and deadline > time.time()):
+            continue
+        state = copy.deepcopy(game.state)
+        seat = state['turn']
+        if deadline is None:
+            poker._set_turn(state, seat)
+        else:
+            action = 'check' if state['players'][seat]['bet'] >= state['current_bet'] else 'fold'
+            poker.move(state, seat, action)
+        try:
+            _save(db, game, state)
+        except PokerConflictError:
+            continue
 
 
 def get_for(db: Session, user: User, code: str) -> PokerGame:
@@ -64,6 +85,8 @@ def create(db: Session, user: User) -> PokerGame:
 
 
 def _save(db: Session, game: PokerGame, state: dict, status: str | None = None) -> PokerGame:
+    if state.get('phase') == 'showdown' and sum(p['stack'] > 0 for p in state['players']) < poker.MIN_PLAYERS and status != 'cancelled':
+        status = 'finished'
     values = {'state': state, 'version': game.version + 1}
     if status:
         values['status'] = status
@@ -147,7 +170,7 @@ def view(game: PokerGame, user: User) -> dict:
         cards = p.get('cards', [])
         if phase != 'showdown' and i != seat:
             cards = [None] * len(cards)
-        elif phase == 'showdown' and p.get('folded') and i != seat:
+        elif phase == 'showdown' and i != seat and (p.get('folded') or not state.get('result', {}).get('scores')):
             cards = [None] * len(cards)
         players.append({key: value for key, value in p.items() if key != 'cards'} | {'seat': i, 'cards': cards})
     mine = state['players'][seat] if seat is not None else None
@@ -161,8 +184,11 @@ def view(game: PokerGame, user: User) -> dict:
         'pot': sum(p.get('invested', 0) for p in state['players']) if phase != 'showdown' else 0,
         'current_bet': state.get('current_bet', 0),
         'min_raise': state.get('min_raise', poker.BIG_BLIND),
+        'min_raise_to': max(poker.BIG_BLIND, state.get('current_bet', 0) + state.get('min_raise', poker.BIG_BLIND)) if state.get('current_bet', 0) >= poker.BIG_BLIND else poker.BIG_BLIND,
+        'turn_deadline': state.get('turn_deadline'),
+        'can_raise': poker.can_raise(state, seat) if mine and phase not in (None, 'showdown') else False,
         'can_continue': sum(p['stack'] > 0 for p in state['players']) >= poker.MIN_PLAYERS,
         'to_call': max(0, state.get('current_bet', 0) - mine.get('bet', 0)) if mine else 0,
         'result': state.get('result'),
-        'invite_url': f'{settings.webapp_url.rstrip("/")}/games/poker/{game.code}',
+        'invite_url': telegram_service.startapp_url(f'poker_{game.code}') or f'{settings.webapp_url.rstrip("/")}/games/poker/{game.code}',
     }

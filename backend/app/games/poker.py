@@ -3,12 +3,14 @@
 from collections import Counter
 from itertools import combinations
 import secrets
+import time
 
 MIN_PLAYERS = 2
 MAX_PLAYERS = 6
 START_STACK = 1000
 SMALL_BLIND = 10
 BIG_BLIND = 20
+TURN_SECONDS = 60
 
 
 class IllegalMove(ValueError):
@@ -56,6 +58,19 @@ def _next(state: dict, after: int, candidates: list[int]) -> int:
     return min(candidates, key=lambda i: (i - after - 1) % len(state['players']))
 
 
+def can_raise(state: dict, seat: int) -> bool:
+    p = state['players'][seat]
+    # A short all-in only reopens betting after a full raise has accumulated.
+    return (not p.get('acted', False)
+            or (p.get('acted_bet', 0) == 0 and state['current_bet'] > 0)
+            or state['current_bet'] - p.get('acted_bet', 0) >= state['min_raise'])
+
+
+def _set_turn(state: dict, seat: int | None) -> None:
+    state['turn'] = seat
+    state['turn_deadline'] = time.time() + TURN_SECONDS if seat is not None else None
+
+
 def _bet(state: dict, seat: int, amount: int) -> None:
     p = state['players'][seat]
     paid = min(p['stack'], amount)
@@ -79,15 +94,15 @@ def new_hand(state: dict) -> dict:
     state.update(deck=deck, board=[], phase='preflop', turn=None, current_bet=0,
                  min_raise=BIG_BLIND, result=None)
     for p in state['players']:
-        p.update(cards=[], folded=False, bet=0, invested=0, acted=False)
+        p.update(cards=[], folded=False, bet=0, invested=0, acted=False, acted_bet=0)
     for i in live:
         state['players'][i]['cards'] = [deck.pop(), deck.pop()]
     _bet(state, small, SMALL_BLIND)
     _bet(state, big, BIG_BLIND)
-    state['current_bet'] = state['players'][big]['bet']
+    state['current_bet'] = BIG_BLIND
     eligible = [i for i in live if state['players'][i]['stack'] > 0]
-    state['turn'] = _next(state, big, eligible) if eligible else None
-    if state['turn'] is None:
+    _set_turn(state, _next(state, big, eligible) if eligible else None)
+    if not eligible or (len(eligible) == 1 and state['players'][eligible[0]]['bet'] >= max(p['bet'] for p in state['players'])):
         _advance(state)
     return state
 
@@ -98,7 +113,7 @@ def _advance(state: dict) -> None:
         winner = contenders[0]
         pot = sum(p['invested'] for p in state['players'])
         state['players'][winner]['stack'] += pot
-        state.update(phase='showdown', turn=None, result={'winners': [winner], 'payouts': {str(winner): pot}})
+        state.update(phase='showdown', turn=None, turn_deadline=None, result={'winners': [winner], 'payouts': {str(winner): pot}})
         return
     while True:
         phase = state['phase']
@@ -116,7 +131,7 @@ def _advance(state: dict) -> None:
             p['acted'] = False
         eligible = [i for i in contenders if state['players'][i]['stack'] > 0]
         if len(eligible) >= 2:
-            state['turn'] = _next(state, state['dealer'], eligible)
+            _set_turn(state, _next(state, state['dealer'], eligible))
             return
 
 
@@ -140,7 +155,7 @@ def _showdown(state: dict) -> None:
         previous = level
     for i, amount in payouts.items():
         players[i]['stack'] += amount
-    state.update(phase='showdown', turn=None, result={
+    state.update(phase='showdown', turn=None, turn_deadline=None, result={
         'winners': [i for i, amount in payouts.items() if amount],
         'payouts': {str(i): amount for i, amount in payouts.items() if amount},
         'scores': {str(i): list(value) for i, value in scores.items()},
@@ -160,9 +175,11 @@ def move(state: dict, seat: int, action: str, amount: int | None = None) -> dict
     elif action == 'call':
         _bet(state, seat, to_call)
     elif action == 'raise':
+        if not can_raise(state, seat):
+            raise IllegalMove('Короткий олл-ин не открывает повторное повышение')
         if amount is None or amount <= state['current_bet'] or amount > p['bet'] + p['stack']:
             raise IllegalMove('Укажите допустимую итоговую ставку')
-        increase = amount - state['current_bet']
+        increase = amount if state['current_bet'] < BIG_BLIND else amount - state['current_bet']
         if increase < state['min_raise'] and amount != p['bet'] + p['stack']:
             raise IllegalMove(f'Минимальное повышение: {state["min_raise"]}')
         _bet(state, seat, amount - p['bet'])
@@ -175,9 +192,11 @@ def move(state: dict, seat: int, action: str, amount: int | None = None) -> dict
         if p['stack'] <= 0:
             raise IllegalMove('Фишек не осталось')
         target = p['bet'] + p['stack']
+        if target > state['current_bet'] and not can_raise(state, seat):
+            raise IllegalMove('Короткий олл-ин не открывает повторное повышение')
         _bet(state, seat, p['stack'])
         if target > state['current_bet']:
-            increase = target - state['current_bet']
+            increase = target if state['current_bet'] < BIG_BLIND else target - state['current_bet']
             if increase >= state['min_raise']:
                 state['min_raise'] = increase
                 for other in state['players']:
@@ -186,14 +205,18 @@ def move(state: dict, seat: int, action: str, amount: int | None = None) -> dict
     else:
         raise IllegalMove('Неизвестное действие')
     p['acted'] = True
+    p['acted_bet'] = state['current_bet']
     contenders = [i for i, other in enumerate(state['players']) if other['cards'] and not other['folded']]
     if len(contenders) == 1:
         _advance(state)
         return state
     pending = [i for i in contenders if state['players'][i]['stack'] > 0 and
                (not state['players'][i]['acted'] or state['players'][i]['bet'] < state['current_bet'])]
+    eligible = [i for i in contenders if state['players'][i]['stack'] > 0]
+    if len(eligible) == 1 and state['players'][eligible[0]]['bet'] >= max(state['players'][i]['bet'] for i in contenders):
+        pending = []
     if pending:
-        state['turn'] = _next(state, seat, pending)
+        _set_turn(state, _next(state, seat, pending))
     else:
         _advance(state)
     return state

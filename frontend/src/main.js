@@ -34,6 +34,7 @@ const START_ROUTES = [
   [/^play_(durak|sea)_(bot|human)$/, (kind, vs) => `/games/${kind}/new?vs=${vs}`],
   [/^durak_([A-Za-z0-9]{4,16})$/, (code) => `/games/durak/${code.toUpperCase()}`],
   [/^sea_([A-Za-z0-9]{4,16})$/, (code) => `/games/sea/${code.toUpperCase()}`],
+  [/^poker_([A-Za-z0-9]{4,16})$/, (code) => `/games/poker/${code.toUpperCase()}`],
   [/^bunker_([A-Za-z0-9]{4,16})$/, (code) => `/games/bunker/${code.toUpperCase()}`],
   [/^games$/, () => '/games'],
   // Привязка существующего аккаунта: ссылка «Подключить Telegram» из веб-версии.
