@@ -255,6 +255,9 @@ function handleLogout() {
         <span class="nav-item__dot nav-item__dot--all" />
         <span class="nav-item__name">Анкеты</span>
       </button>
+      <button v-if="authStore.isAdmin" class="nav-item" :class="{ 'nav-item--active': route.name === 'telegram-polls' }" @click="router.push({ name: 'telegram-polls' })">
+        <span class="nav-item__dot nav-item__dot--all" /><span class="nav-item__name">Опросы в Telegram</span>
+      </button>
       <button
         v-if="authStore.isAdmin"
         class="nav-item"

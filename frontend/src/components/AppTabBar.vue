@@ -33,7 +33,7 @@ const isEditorialActive = computed(
 )
 // «Ещё» активна, когда открыт раздел из шторки.
 const isMoreActive = computed(() =>
-  ['welcome-book', 'calendar', 'leadership-timeline', 'zavod', 'users', 'broadcast', 'checklists', 'games', 'durak'].includes(route.name) ||
+  ['welcome-book', 'calendar', 'leadership-timeline', 'zavod', 'users', 'telegram-polls', 'broadcast', 'checklists', 'games', 'durak'].includes(route.name) ||
     route.name?.startsWith('survey'),
 )
 
@@ -128,6 +128,7 @@ function handleLogout() {
             Пользователи
           </button>
           <button class="sheet-item" @click="go('surveys')">Анкеты</button>
+          <button v-if="authStore.isAdmin" class="sheet-item" @click="go('telegram-polls')">Опросы в Telegram</button>
           <button v-if="authStore.isAdmin" class="sheet-item" @click="go('broadcast')">
             Рассылка
           </button>

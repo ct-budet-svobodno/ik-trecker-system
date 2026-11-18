@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     auth,
+    telegram_polls,
     broadcasts,
     checklists,
     directions,
@@ -44,3 +45,5 @@ api_router.include_router(broadcasts.router, prefix="/broadcasts", tags=["broadc
 api_router.include_router(checklists.router, prefix="/checklists", tags=["checklists"])
 api_router.include_router(surveys.router, prefix="/surveys", tags=["surveys"])
 api_router.include_router(welcome_book.router, prefix="/welcome-book", tags=["welcome-book"])
+
+api_router.include_router(telegram_polls.router, prefix="/telegram-polls", tags=["telegram-polls"])

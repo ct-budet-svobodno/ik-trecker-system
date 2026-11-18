@@ -3,6 +3,7 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from dotenv import load_dotenv
 
+from handlers.command_tracker_poll import poll_router
 from handlers.command_help import help_router
 from handlers.command_mafia import mafia_router
 from handlers.command_people import people_router
@@ -55,6 +56,7 @@ dp.include_router(checklist_router)
 dp.include_router(admin_router)
 dp.include_router(mod_router)
 dp.include_router(help_router)
+dp.include_router(poll_router)
 dp.include_router(tracker_router)
 dp.include_router(people_router)
 dp.include_router(random_router)

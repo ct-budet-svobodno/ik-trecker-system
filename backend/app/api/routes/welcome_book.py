@@ -1,11 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from starlette.concurrency import run_in_threadpool
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_role
 from app.models.user import User, UserRole
+from app.db.session import get_db
+from app.schemas.welcome_book import WelcomeBookProgressIn
 from app.services import welcome_book_service as service
 
 router = APIRouter()
+
+
+@router.put("/progress", status_code=204)
+def save_progress(payload: WelcomeBookProgressIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        service.record_progress(db, current_user.id, payload.version, payload.page)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/readers")
+def get_readers(db: Session = Depends(get_db), current_user: User = Depends(require_role(UserRole.ADMIN))):
+    return service.readers(db)
 
 
 @router.get("")

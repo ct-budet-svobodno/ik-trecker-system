@@ -91,6 +91,12 @@ const routes = [
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
+    path: '/telegram-polls',
+    name: 'telegram-polls',
+    component: () => import('../views/TelegramPollsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
     path: '/broadcast',
     name: 'broadcast',
     component: () => import('../views/BroadcastView.vue'),

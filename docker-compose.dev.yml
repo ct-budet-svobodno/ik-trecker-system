@@ -58,6 +58,7 @@ services:
         required: false
     environment:
       TRACKER_DB_PATH: /tracker-data/ik_tracker.db
+      TRACKER_API_URL: http://backend:8000
     volumes:
       - ./bot/database:/app/database
       - bot_whisper_cache:/app/whisper-cache

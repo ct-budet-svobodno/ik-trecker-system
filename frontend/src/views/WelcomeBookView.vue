@@ -3,8 +3,9 @@ import { defineAsyncComponent, onMounted, ref } from 'vue'
 
 import AppSidebar from '../components/AppSidebar.vue'
 import BaseIcon from '../components/BaseIcon.vue'
+import WelcomeBookStats from '../components/WelcomeBookStats.vue'
 import coverUrl from '../assets/welcome-book-cover.png'
-import { fetchWelcomeBook, fetchWelcomeBookPdf, uploadWelcomeBook } from '../api/welcomeBook'
+import { fetchWelcomeBook, fetchWelcomeBookPdf, saveWelcomeBookProgress, uploadWelcomeBook } from '../api/welcomeBook'
 import { useAuthStore } from '../stores/auth'
 
 const WelcomeBookReader = defineAsyncComponent(() => import('../components/WelcomeBookReader.vue'))
@@ -19,6 +20,31 @@ const success = ref('')
 const fileInput = ref(null)
 const data = ref(null)
 const reading = ref(false)
+const readingVersion = ref('')
+const statsRevision = ref(0)
+const syncError = ref('')
+let progressQueue = Promise.resolve()
+
+function recordProgress(page) {
+  const version = readingVersion.value
+  progressQueue = progressQueue.then(async () => {
+    try {
+      await saveWelcomeBookProgress(version, page)
+      syncError.value = ''
+    } catch (e) {
+      syncError.value = e.response?.status === 409
+        ? 'Издание изменилось. Закройте книгу и обновите раздел.'
+        : 'Прогресс не сохранился. Проверьте соединение; попробуем при следующем перелистывании.'
+    }
+  })
+}
+
+async function closeBook() {
+  reading.value = false
+  data.value = null
+  await progressQueue
+  statsRevision.value++
+}
 
 async function load() {
   loading.value = true
@@ -32,6 +58,8 @@ async function openBook() {
   opening.value = true
   error.value = ''
   try {
+    readingVersion.value = info.value.version
+    syncError.value = ''
     data.value = await fetchWelcomeBookPdf()
     reading.value = true
   } catch { error.value = 'Не удалось открыть книгу. Проверьте соединение и попробуйте снова.' }
@@ -54,6 +82,7 @@ async function upload(event) {
       progress.value = total ? Math.round(loaded / total * 100) : 0
     })
     data.value = null
+    statsRevision.value++
     success.value = 'Велкомбук обновлён и доступен всем участникам.'
   } catch (e) {
     error.value = e.response?.data?.detail || 'Не удалось загрузить PDF. Попробуйте ещё раз.'
@@ -88,10 +117,12 @@ onMounted(load)
             <span class="book-details">{{ info.pages }} стр. · На весь экран · Сохраняет место чтения</span>
             <button class="book-open" :disabled="opening || uploading" @click="openBook">{{ opening ? 'Открываем…' : 'Читать велкомбук' }} <BaseIcon name="arrow-right" /></button>
             <p class="book-help">На компьютере — развороты, на телефоне — по одной странице.</p>
+            <p class="book-help">Администратору видны открытие книги и самая дальняя просмотренная страница.</p>
           </div>
         </section>
         <section v-else-if="info" class="book-empty"><h2>Скоро здесь будет наша история</h2><p>Администратор ещё не добавил велкомбук.</p></section>
         <button v-else class="book-retry" @click="load">Попробовать снова</button>
+        <WelcomeBookStats v-if="authStore.isAdmin && info?.available" :key="statsRevision" />
         <section v-if="authStore.isAdmin && !loading" class="book-admin">
           <div><h2>Издание велкомбука</h2><p>Загрузи PDF, чтобы {{ info?.available ? 'заменить текущее издание' : 'открыть его для всей команды' }}. До 18 МБ, без пароля.</p></div>
           <input ref="fileInput" type="file" accept=".pdf,application/pdf" class="file-input" @change="upload" />
@@ -99,7 +130,7 @@ onMounted(load)
         </section>
       </div>
     </main>
-    <Teleport to="body"><WelcomeBookReader v-if="reading && data" :data="data" :storage-key="`ik-welcome-book:${authStore.user.id}:${info.version}`" @close="reading = false; data = null" /></Teleport>
+    <Teleport to="body"><WelcomeBookReader v-if="reading && data" :data="data" :sync-error="syncError" :storage-key="`ik-welcome-book:${authStore.user.id}:${readingVersion}`" @progress="recordProgress" @close="closeBook" /></Teleport>
   </div>
 </template>
 

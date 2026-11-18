@@ -14,3 +14,11 @@ export async function uploadWelcomeBook(file, onUploadProgress) {
     onUploadProgress,
   })).data
 }
+
+export async function saveWelcomeBookProgress(version, page) {
+  await apiClient.put('/welcome-book/progress', { version, page })
+}
+
+export async function fetchWelcomeBookReaders() {
+  return (await apiClient.get('/welcome-book/readers')).data
+}

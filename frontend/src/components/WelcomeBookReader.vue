@@ -6,8 +6,8 @@ import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 
 import BaseIcon from './BaseIcon.vue'
 
-const props = defineProps({ data: { type: ArrayBuffer, required: true }, storageKey: { type: String, required: true } })
-const emit = defineEmits(['close'])
+const props = defineProps({ data: { type: ArrayBuffer, required: true }, storageKey: { type: String, required: true }, syncError: { type: String, default: '' } })
+const emit = defineEmits(['close', 'progress'])
 GlobalWorkerOptions.workerSrc = workerUrl
 
 const root = ref(null)
@@ -38,6 +38,12 @@ const readingProgress = computed(() => {
   const lastVisible = current.value + (landscape.value && current.value > 0 ? 2 : 1)
   return Math.round(Math.min(lastVisible, total.value) / total.value * 100)
 })
+
+function reportProgress() {
+  if (!ready.value || destroyed) return
+  const lastVisible = current.value + (landscape.value && current.value > 0 ? 2 : 1)
+  emit('progress', Math.min(lastVisible, total.value))
+}
 
 function remember() {
   pageInput.value = current.value + 1
@@ -119,6 +125,7 @@ async function buildBook(ratio) {
     flip.turnToPage(saved)
     turning.value = false
     ready.value = true
+    reportProgress()
     return
   }
   host = document.createElement('div')
@@ -151,6 +158,7 @@ async function buildBook(ratio) {
     current.value = data
     remember()
     warmPages()
+    reportProgress()
   })
   flip.on('changeState', ({ data }) => { turning.value = data !== 'read' })
   flip.loadFromHTML(pages)
@@ -158,7 +166,10 @@ async function buildBook(ratio) {
   remember()
   warmPages()
   await Promise.all([renderPage(current.value), renderPage(current.value + 1)])
-  if (!destroyed && generation === build) ready.value = true
+  if (!destroyed && generation === build) {
+    ready.value = true
+    reportProgress()
+  }
 }
 
 function turn(direction) {
@@ -281,6 +292,7 @@ onBeforeUnmount(() => {
     <div ref="stage" class="book-stage" :class="{ 'book-stage--loading': !ready }" />
     <div v-if="!ready && !error" class="reader-loading" role="status">Открываем книгу…</div>
     <footer class="reader-footer">
+      <span v-if="syncError" class="reader-sync-error" role="status">{{ syncError }}</span>
       <div class="reader-controls">
         <button class="reader-button" :disabled="!ready || current === 0 || turning" aria-label="Предыдущая страница" @click="turn(-1)"><BaseIcon name="chevron-left" /></button>
         <form class="page-picker" @submit.prevent="goToPage">
@@ -326,6 +338,7 @@ onBeforeUnmount(() => {
 .reader-loading { position: absolute; top: 50%; align-self: center; color: var(--text-muted); }
 .reader-error, .reader-notice { padding: var(--space-3); margin: 0; text-align: center; font-size: 13px; }
 .reader-error { color: var(--danger); }
+.reader-sync-error { color: var(--danger); font-size: 12px; text-align: center; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 @media (max-width: 600px) {
   .reader-header { padding-left: var(--space-2); padding-right: var(--space-2); }

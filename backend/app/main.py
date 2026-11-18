@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import api_router
 from app.core.config import settings
-from app.services import bot_import_service, poker_service
+from app.services import bot_import_service, poker_service, telegram_poll_service
 from app.db.session import SessionLocal
 
 
@@ -29,12 +29,14 @@ async def _poker_clock():
 async def lifespan(_: FastAPI):
     # Анкеты из бота → аккаунты трекера: сразу и дальше по расписанию.
     bot_import_service.start_background()
+    poll_delivery = asyncio.create_task(asyncio.to_thread(telegram_poll_service.recover_delivery))
     poker_clock = asyncio.create_task(_poker_clock())
     try:
         yield
     finally:
+        poll_delivery.cancel()
         poker_clock.cancel()
-        await asyncio.gather(poker_clock, return_exceptions=True)
+        await asyncio.gather(poker_clock, poll_delivery, return_exceptions=True)
 
 
 app = FastAPI(title="ИК Таск-трекер API", lifespan=lifespan)

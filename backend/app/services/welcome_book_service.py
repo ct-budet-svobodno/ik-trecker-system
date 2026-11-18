@@ -1,11 +1,14 @@
 import hashlib
+from datetime import UTC
 from io import BytesIO
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from pypdf import PdfReader
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.repositories import welcome_book_repository
 
 MAX_BYTES = 18 * 1024 * 1024
 MAX_PAGES = 300
@@ -58,3 +61,28 @@ def publish(data: bytes) -> dict:
         if temp_path is not None:
             temp_path.unlink(missing_ok=True)
     return info
+
+
+def record_progress(db: Session, user_id: int, version: str, page: int) -> None:
+    info = metadata()
+    if not info["available"] or version != info["version"]:
+        raise ValueError("Издание велкомбука изменилось. Откройте раздел заново.")
+    if page > info["pages"]:
+        raise ValueError("Такой страницы в велкомбуке нет")
+    welcome_book_repository.record(db, user_id, version, page)
+
+
+def readers(db: Session) -> dict:
+    info = metadata()
+    if not info["available"]:
+        return {"available": False, "readers": []}
+    rows = []
+    for user, progress in welcome_book_repository.list_readers(db, info["version"]):
+        page = progress.max_page if progress else 0
+        rows.append({
+            "user_id": user.id, "full_name": user.full_name, "username": user.username,
+            "max_page": page, "percent": 100 if page == info["pages"] else min(99, round(page / info["pages"] * 100)),
+            "first_opened_at": progress.first_opened_at.replace(tzinfo=UTC) if progress else None,
+            "last_seen_at": progress.last_seen_at.replace(tzinfo=UTC) if progress else None,
+        })
+    return {**info, "readers": rows}

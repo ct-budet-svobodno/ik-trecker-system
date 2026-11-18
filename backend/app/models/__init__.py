@@ -1,3 +1,4 @@
+from app.models.telegram_poll import TelegramPoll, TelegramPollRecipient, TelegramPollChat
 from app.models.broadcast import Broadcast, BroadcastStatus
 from app.models.bunker_game import BunkerGame, BunkerPlayer, BunkerStatus
 from app.models.checklist import ChecklistCard, ChecklistStatus
@@ -21,9 +22,14 @@ from app.models.survey import Survey, SurveyRecipient, SurveyResponse, SurveySta
 from app.models.task import Task, TaskAssignee, TaskComment, TaskPriority, TaskStatus
 from app.models.user import LeadershipPosition, RegistrationStatus, User, UserRole
 from app.models.user_profile import UserProfile
+from app.models.welcome_book import WelcomeBookProgress
 from app.models.zavod import ZavodBoard, ZavodEdge, ZavodNode, ZavodNodeStatus
 
 __all__ = [
+    "TelegramPoll",
+    "TelegramPollRecipient",
+    "TelegramPollChat",
+    "WelcomeBookProgress",
     "Broadcast",
     "BroadcastStatus",
     "BunkerGame",
